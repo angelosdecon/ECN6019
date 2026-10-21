@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 4 games – Dashboard</title>
+<link rel="stylesheet" href="../shared/style.css">
+</head>
+<body class="dash">
+  <div class="band">
+    <div><div class="brand">Week 4 games</div><div class="sub" id="modname"></div></div>
+    <div style="display:flex;gap:10px;align-items:center"><span id="demoflag"></span><span id="joined" class="pill"></span></div>
+  </div>
+  <main><div class="stage" id="stage"></div></main>
+  <div class="controls" id="controls">
+    <button id="back">◀ Back</button>
+    <button class="primary" id="next">Next ▶</button>
+    <div class="grow"><select id="steps" aria-label="Jump to step"></select></div>
+    <button id="startCoin" title="Jump to Fake a coin">Fake a coin</button>
+    <button id="startPG" title="Jump to the public goods game">Public goods</button>
+    <button id="bots" class="hidden">+ 16 simulated students</button>
+    <button id="newSession" title="Start a new session: everyone re-joins">New session</button>
+  </div>
+
+  <script src="../shared/config.js"></script>
+  <script src="../shared/lib/firebase-app-compat.js"></script>
+  <script src="../shared/lib/firebase-firestore-compat.js"></script>
+  <script src="../shared/lib/chart.umd.min.js"></script>
+  <script src="../shared/lib/qrcode.js"></script>
+  <script src="../shared/store.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>
