@@ -10,6 +10,18 @@
   let pid = idStore.getItem(ID_KEY);
   if (!pid) { pid = B.newId(); idStore.setItem(ID_KEY, pid); }
 
+  // Phones pause pages when the screen locks or the student switches app, and the live
+  // connection does not always resume. When the page comes back after a pause, reload it:
+  // the phone keeps its anonymous id, so the student goes straight back to their group.
+  let hiddenAt = null;
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) { hiddenAt = Date.now(); return; }
+    if (hiddenAt && Date.now() - hiddenAt > 3000) location.reload();
+    hiddenAt = null;
+  });
+  window.addEventListener("pageshow", (e) => { if (e.persisted) location.reload(); });
+  window.addEventListener("online", () => location.reload());
+
   const st = { state: null, player: null, group: null, coin: null };
   const ui = { choose: {}, punish: {}, coinSeq: "", phaseSeen: {} };
   let unGroup = null, groupId = null, lastSig = "";
@@ -81,7 +93,12 @@
     else if (s.game === "coin") [sig, html] = renderCoin(s);
     else if (s.game === "end") { sig = "end"; html = `<h2>Thanks for playing</h2><div class="rule"></div><p>You can close this page. Keep it open if the lecturer says there is more to come.</p>`; }
     else { sig = "lobby"; html = `<h2>You're in!</h2><div class="rule"></div><p class="lead">Keep this page open. It will change by itself when the lecturer starts a game.</p><p class="muted small">Your answers are anonymous.</p>`; }
-    document.getElementById("status").textContent = s && s.game && s.game !== "lobby" ? "" : "connected";
+    const status = document.getElementById("status");
+    if (!status.dataset.ready) {
+      status.dataset.ready = "1";
+      status.innerHTML = '<a href="#" id="reload" style="color:var(--blue)">Not updating? Tap here</a>';
+      document.getElementById("reload").onclick = (e) => { e.preventDefault(); location.reload(); };
+    }
     if (sig === lastSig) return;          // nothing that this phone shows has changed
     lastSig = sig; view.innerHTML = html; bind(s);
   }
