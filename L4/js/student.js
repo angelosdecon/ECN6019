@@ -22,8 +22,8 @@
   window.addEventListener("pageshow", (e) => { if (e.persisted) location.reload(); });
   window.addEventListener("online", () => location.reload());
 
-  const st = { state: null, player: null, group: null, coin: null };
-  const ui = { choose: {}, punish: {}, coinSeq: "", phaseSeen: {} };
+  const st = { state: null, player: null, group: null, coin: null, ult: null };
+  const ui = { choose: {}, punish: {}, coinSeq: "", phaseSeen: {}, ult: { lobby: null, offer: null, mao: null } };
   let unGroup = null, groupId = null, lastSig = "";
 
   S.onDoc("", (d) => { st.state = d; register(); render(); });
@@ -37,6 +37,7 @@
     register(); render();
   });
   S.onDoc("coin/" + pid, (d) => { st.coin = d; render(); });
+  S.onDoc("ult/" + pid, (d) => { st.ult = d; render(); });
 
   // Join the current lobby (one write each time the lecturer opens a new session).
   function register() {
@@ -91,6 +92,7 @@
     if (!s || !s.lobby) { sig = "wait"; html = `<h2>Welcome</h2><div class="rule"></div><p>Waiting for the lecturer to open the session…</p>`; }
     else if (s.game === "pg") [sig, html] = renderPG(s);
     else if (s.game === "coin") [sig, html] = renderCoin(s);
+    else if (s.game === "ult") [sig, html] = renderUlt(s);
     else if (s.game === "end") { sig = "end"; html = `<h2>Thanks for playing</h2><div class="rule"></div><p>You can close this page. Keep it open if the lecturer says there is more to come.</p>`; }
     else { sig = "lobby"; html = `<h2>You're in!</h2><div class="rule"></div><p class="lead">Keep this page open. It will change by itself when the lecturer starts a game.</p><p class="muted small">Your answers are anonymous.</p>`; }
     const status = document.getElementById("status");
@@ -194,6 +196,38 @@
   }
 
   // ---------- fake a coin ----------
+  // ---------- ultimatum game ----------
+  function renderUlt(s) {
+    const P = B.ULT.pie, mine = st.ult && st.ult.lobby === s.lobby ? st.ult : null;
+    if (s.phase === "play") {
+      if (ui.ult.lobby !== s.lobby) ui.ult = { lobby: s.lobby, offer: mine ? mine.offer : null, mao: mine ? mine.mao : null };
+      const row = (key) => `<div class="quick">${Array.from({ length: P + 1 }, (_, v) => `<button data-${key}="${v}" style="${ui.ult[key] === v ? "background:var(--blue);color:#fff;border-color:var(--blue)" : ""}">£${v}</button>`).join("")}</div>`;
+      const ready = ui.ult.offer != null && ui.ult.mao != null;
+      const done = mine && mine.offer === ui.ult.offer && mine.mao === ui.ult.mao;
+      return ["ult-play-" + JSON.stringify(ui.ult) + JSON.stringify(mine) + s.phaseId, `<h2>Ultimatum game</h2><div class="rule"></div>
+        <p>You and a <b>randomly chosen classmate</b> split <b>£${P}</b>. You play <b>both roles</b>. If an offer is at least the responder's minimum, the split happens; if not, <b>both get nothing</b>.</p>
+        <div class="card"><b>1. You are the proposer.</b> How much do you offer the other person?${row("offer")}
+        ${ui.ult.offer != null ? `<p class="small muted" style="margin:0">You keep £${P - ui.ult.offer}, they get £${ui.ult.offer}, if they accept.</p>` : ""}</div>
+        <div class="card"><b>2. You are the responder.</b> What is the <b>smallest</b> offer you would accept?${row("mao")}
+        ${ui.ult.mao != null ? `<p class="small muted" style="margin:0">You accept £${ui.ult.mao} or more, and reject anything below.</p>` : ""}</div>
+        <button class="primary big full" id="usubmit" ${ready && !done ? "" : "disabled"}>${mine ? "Change my choices" : "Submit"}</button>
+        ${done ? `<p class="center" style="color:var(--ok)"><b>Submitted.</b> You can change your choices until the lecturer moves on.</p>` : ""}
+        ${timerHtml()}`];
+    }
+    if (s.phase === "results") {
+      const r = s.ultRes && s.ultRes.by && s.ultRes.by[pid];
+      if (!r) return ["ult-res-none", `<h2>Ultimatum game</h2><div class="rule"></div><p>Look at the screen for the class results.</p>`];
+      return ["ult-res-" + JSON.stringify(r), `<h2>Your results</h2><div class="rule"></div>
+        <div class="card"><b>As proposer</b><p>You offered <b>£${r.offer}</b>. Your partner's minimum was £${r.theirMin}.</p>
+        <p>${r.acc ? `<b style="color:var(--ok)">Accepted:</b> you get £${P - r.offer}, they get £${r.offer}.` : `<b style="color:var(--warn)">Rejected:</b> you both get nothing.`}</p></div>
+        <div class="card"><b>As responder</b><p>Another classmate offered you <b>£${r.got}</b>. Your minimum was £${r.myMin}.</p>
+        <p>${r.accR ? `<b style="color:var(--ok)">You accepted:</b> you get £${r.got}, they get £${P - r.got}.` : `<b style="color:var(--warn)">You rejected:</b> you both get nothing.`}</p></div>
+        <div class="kpis"><div class="kpi"><div class="v">£${r.earn}</div><div class="l">your total</div></div></div>
+        <p class="muted small">Look at the screen for the whole class.</p>`];
+    }
+    return ["ult-other", `<p>Look at the screen.</p>`];
+  }
+
   function renderCoin(s) {
     const c = st.coin && st.coin.lobby === s.lobby ? st.coin : {};
     if (s.phase === "play") {
@@ -247,6 +281,11 @@
       $("h").onclick = () => add("H"); $("t").onclick = () => add("T");
       $("undo").onclick = () => { ui.coinSeq = ui.coinSeq.slice(0, -1); render(); };
       $("csubmit").onclick = () => { $("csubmit").disabled = true; S.setDoc("coin/" + pid, { fake: ui.coinSeq, real: B.randomSeq(B.COIN.length), lobby: s.lobby }, true); };
+    }
+    if (s && s.game === "ult" && s.phase === "play") {
+      view.querySelectorAll("[data-offer]").forEach((b) => (b.onclick = () => { ui.ult.offer = Number(b.dataset.offer); render(); }));
+      view.querySelectorAll("[data-mao]").forEach((b) => (b.onclick = () => { ui.ult.mao = Number(b.dataset.mao); render(); }));
+      $("usubmit").onclick = () => { $("usubmit").disabled = true; S.setDoc("ult/" + pid, { offer: ui.ult.offer, mao: ui.ult.mao, lobby: s.lobby }); };
     }
     if (s && s.game === "coin" && s.phase === "spot") {
       view.querySelectorAll("[data-vote]").forEach((b) => (b.onclick = () => S.setDoc("coin/" + pid, { vote: b.dataset.vote, lobby: s.lobby }, true)));

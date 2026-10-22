@@ -15,6 +15,7 @@ window.BL = (function () {
     ]
   };
   const COIN = { length: 20, playSecs: 90 };
+  const ULT = { pie: 10, playSecs: 45 };   // £10 to split; whole pounds
 
   const COLOURS = [
     { name: "Green", hex: "#2e9e5b" }, { name: "Orange", hex: "#e8833a" },
@@ -82,5 +83,5 @@ window.BL = (function () {
   function fmt(x, d) { return (Math.round(x * Math.pow(10, d || 0)) / Math.pow(10, d || 0)).toString(); }
   function mean(a) { return a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0; }
 
-  return { PG, COIN, COLOURS, makeGroups, roundEarnings, longestRun, switches, randomSeq, newId, fmt, mean, clampInt, shuffle };
+  return { PG, COIN, ULT, COLOURS, makeGroups, roundEarnings, longestRun, switches, randomSeq, newId, fmt, mean, clampInt, shuffle };
 })();

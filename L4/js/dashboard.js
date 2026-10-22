@@ -28,23 +28,26 @@
     if (r.n === 4) STEPS.push({ id: "pg-chart", label: "Public goods: class chart, rounds 1–4", round: 4 });
   }
   STEPS.push({ id: "pg-final", label: "Public goods: final reveal", round: PG.rounds.length });
+  STEPS.push({ id: "ult-play", label: "Ultimatum: play (offer and minimum)" }, { id: "ult-results", label: "Ultimatum: results" });
   STEPS.push({ id: "coin-play", label: "Fake a coin: play" }, { id: "coin-results", label: "Fake a coin: results" },
     { id: "coin-spot", label: "Fake a coin: spot the fake (vote)" }, { id: "coin-reveal", label: "Fake a coin: reveal" },
     { id: "end", label: "End" });
   $("steps").innerHTML = STEPS.map((s, i) => `<option value="${i}">${i + 1}. ${s.label}</option>`).join("");
 
   // ---------- live data ----------
-  const D = { state: null, players: [], groups: [], coin: [] };
+  const D = { state: null, players: [], groups: [], coin: [], ult: [] };
   let mountedKey = null, charts = {};
   S.onDoc("", (d) => { D.state = d; if (!d || !d.lobby) initSession(); render(); botsReact(); });
   S.onCol("players", (a) => { D.players = a; render(); });
   S.onCol("groups", (a) => { D.groups = a; render(); });
   S.onCol("coin", (a) => { D.coin = a; render(); });
+  S.onCol("ult", (a) => { D.ult = a; render(); });
 
   const lobby = () => (D.state && D.state.lobby) || null;
   const here = () => D.players.filter((p) => p.data.lobby === lobby());
   const curGroups = () => D.groups.filter((g) => g.data.formation && g.data.formation === (D.state && D.state.formation));
   const coinRows = () => D.coin.filter((c) => c.data.lobby === lobby());
+  const ultRows = () => D.ult.filter((c) => c.data.lobby === lobby() && c.data.offer != null && c.data.mao != null);
   const rk = (r) => "r" + r;
   const pct = (x) => Math.round(100 * x);
 
@@ -60,6 +63,7 @@
   $("steps").onchange = (e) => goTo(Number(e.target.value));
   $("startPG").onclick = () => goTo(1);
   $("startCoin").onclick = () => goTo(STEPS.findIndex((s) => s.id === "coin-play"));
+  $("startUlt").onclick = () => goTo(STEPS.findIndex((s) => s.id === "ult-play"));
   $("newSession").onclick = async () => {
     if (!confirm("Start a new session? Everyone's phone re-joins automatically; earlier answers are kept out of the results.")) return;
     await S.setDoc("", { lobby: "L" + Date.now().toString(36), step: 0, game: "lobby", phase: "", phaseId: "p" + Date.now() });
@@ -78,8 +82,8 @@
     busy = true;
     try {
       const st = STEPS[i], prev = STEPS[curStep()];
-      const s = { lobby: lobby(), step: i, phaseId: "p" + Date.now(), formation: D.state.formation || null, coinLobby: D.state.coinLobby || null, spot: D.state.spot || null };
-      const game = st.id.startsWith("pg") ? "pg" : st.id.startsWith("coin") ? "coin" : st.id === "end" ? "end" : "lobby";
+      const s = { lobby: lobby(), step: i, phaseId: "p" + Date.now(), formation: D.state.formation || null, coinLobby: D.state.coinLobby || null, spot: D.state.spot || null, ultLobby: D.state.ultLobby || null, ultRes: D.state.ultRes || null };
+      const game = st.id.startsWith("pg") ? "pg" : st.id.startsWith("coin") ? "coin" : st.id.startsWith("ult") ? "ult" : st.id === "end" ? "end" : "lobby";
       Object.assign(s, { game, phase: st.id.split("-")[1] || "", round: st.round || 0, secs: 0 });
 
       if (st.id === "pg-intro") {
@@ -104,6 +108,11 @@
         s.secs = B.COIN.playSecs;
         if (D.state.coinLobby !== lobby()) { await S.clearCol("coin"); s.coinLobby = lobby(); s.spot = null; }
       }
+      if (st.id === "ult-play") {
+        s.secs = B.ULT.playSecs;
+        if (D.state.ultLobby !== lobby()) { await S.clearCol("ult"); s.ultLobby = lobby(); s.ultRes = null; }
+      }
+      if (st.id === "ult-results" && !(D.state.ultRes && D.state.ultRes.lobby === lobby() && D.state.ultRes.n === ultRows().length)) s.ultRes = matchUltimatum();
       if (st.id === "coin-spot" && (!D.state.spot || D.state.spot.lobby !== lobby())) s.spot = pickSpot();
       await S.setDoc("", s);
     } finally { busy = false; }
@@ -124,6 +133,20 @@
     }
     await S.batchSet(items);
     return f;
+  }
+
+  // Everyone plays both roles: shuffled into a ring, each offers to the next and responds to the previous.
+  function matchUltimatum() {
+    const rows = B.shuffle(ultRows()); const n = rows.length; const res = { lobby: lobby(), n, by: {} };
+    if (n < 2) return res;
+    for (let k = 0; k < n; k++) {
+      const me = rows[k], to = rows[(k + 1) % n], from = rows[(k - 1 + n) % n];
+      const offer = B.clampInt(me.data.offer, 0, B.ULT.pie), theirMin = B.clampInt(to.data.mao, 0, B.ULT.pie);
+      const got = B.clampInt(from.data.offer, 0, B.ULT.pie), myMin = B.clampInt(me.data.mao, 0, B.ULT.pie);
+      const acc = offer >= theirMin, accR = got >= myMin;
+      res.by[me.id] = { offer, theirMin, acc, got, myMin, accR, earn: (acc ? B.ULT.pie - offer : 0) + (accR ? got : 0) };
+    }
+    return res;
   }
 
   function pickSpot() {
@@ -206,6 +229,15 @@
     return { type: "bar", data: { labels: bins, datasets: [{ label: "students", data: cnt, backgroundColor: BLUE }] },
       options: { maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } },
         scales: { x: { title: { display: true, text: "tokens put in the pot" } }, y: { beginAtZero: true, ticks: { precision: 0 }, title: { display: true, text: "students" } } } } };
+  }
+  function ultConfig(offers, mins) {
+    const labels = Array.from({ length: B.ULT.pie + 1 }, (_, i) => "£" + i);
+    const dist = (arr) => { const c = Array(B.ULT.pie + 1).fill(0); for (const v of arr) c[v]++; return c.map((x) => (arr.length ? pct(x / arr.length) : 0)); };
+    return { type: "bar", data: { labels, datasets: [
+      { label: "Offer made", data: dist(offers), backgroundColor: BLUE },
+      { label: "Smallest offer accepted", data: dist(mins), backgroundColor: ORANGE }] },
+      options: { maintainAspectRatio: false, animation: false, plugins: { legend: { position: "bottom" } },
+        scales: { x: { title: { display: true, text: "amount offered to the responder (of £" + B.ULT.pie + ")" } }, y: { beginAtZero: true, title: { display: true, text: "% of students" } } } } };
   }
   function runConfig(fakes, reals) {
     const labels = ["1", "2", "3", "4", "5", "6", "7+"];
@@ -293,6 +325,15 @@
         <div class="card"><h2>A <span id="tagA"></span></h2>${chipRow(s.spot && s.spot.A, "bigseq")}</div>
         <div class="card"><h2>B <span id="tagB"></span></h2>${chipRow(s.spot && s.spot.B, "bigseq")}</div>
         <div class="kpis">${kpi("k-vA", "voted A", null)}${kpi("k-vB", "voted B", null)}${st.id === "coin-reveal" ? kpi("k-right", "spotted the real coin", null) : ""}</div>`;
+      case "ult-play": return `<h1>Ultimatum game</h1><div class="rule"></div>
+        <div class="card soft lead">You and a <b>randomly chosen classmate</b> split <b>£${B.ULT.pie}</b>. Everyone plays <b>both roles</b>:
+        <ul><li><b>Proposer:</b> how much do you offer the other person?</li><li><b>Responder:</b> what is the smallest offer you would accept?</li></ul>
+        If the offer is at least the responder's minimum, the split happens. If not, <b>both get nothing</b>.</div>
+        <div class="kpis">${kpi("k-ans", "answers in", null)}<div class="kpi"><div class="v timer" id="dtimer">–</div><div class="l">time left</div></div></div>${progress("bar")}`;
+      case "ult-results": return `<h1>Ultimatum game: results</h1><div class="rule"></div>
+        <div class="kpis">${kpi("k-off", "average offer (of £" + B.ULT.pie + ")", null)}${kpi("k-half", "offered an equal split", null)}${kpi("k-mao", "average minimum accepted", null)}${kpi("k-rej", "offers rejected", null)}</div>
+        <div class="chartbox"><canvas id="c-ult"></canvas></div>
+        <p class="lead">Self-interest predicts: offer <b>£1</b>, and accept <b>any positive offer</b>.</p>`;
       case "end": return `<h1>Thanks for playing</h1><div class="rule"></div><p class="lead">Use the step menu below to go back to any screen.</p>`;
     }
     return "";
@@ -306,6 +347,7 @@
     if ($("c-line")) chart("c-line", lineConfig(doneRounds()));
     if ($("c-hist")) chart("c-hist", histConfig(roundStats(s.round).vals));
     if ($("c-run")) chart("c-run", runConfig([], []));
+    if ($("c-ult")) chart("c-ult", ultConfig([], []));
   }
 
   function update(st, s) {
@@ -339,6 +381,16 @@
         <p>Put in less than ${PG.endowment / 2}: <b>${B.fmt(B.mean(lowR), 1)}</b> points<br>Put in ${PG.endowment / 2} or more: <b>${B.fmt(B.mean(highR), 1)}</b> points</p>
         <p class="muted">The top earner put in ${top ? B.fmt(B.mean(contr[top]), 1) : "–"} tokens per round on average; the class average was ${B.fmt(B.mean(early.concat(late)), 1)}.</p>`;
       refresh("c-line", lineConfig(PG.rounds.length));
+    }
+    if (st.id === "ult-play") { const n = here().length, a = ultRows().length; set("k-ans", a + " / " + n); setProgress("bar", a, n); }
+    if (st.id === "ult-results") {
+      const rows = ultRows(), offers = rows.map((r) => B.clampInt(r.data.offer, 0, B.ULT.pie)), mins = rows.map((r) => B.clampInt(r.data.mao, 0, B.ULT.pie));
+      set("k-off", offers.length ? "£" + B.fmt(B.mean(offers), 1) : "–");
+      set("k-half", offers.length ? pct(offers.filter((v) => v === B.ULT.pie / 2).length / offers.length) + "%" : "–");
+      set("k-mao", mins.length ? "£" + B.fmt(B.mean(mins), 1) : "–");
+      const by = (s.ultRes && s.ultRes.by) || {}, ids = Object.keys(by);
+      set("k-rej", ids.length ? pct(ids.filter((id) => !by[id].acc).length / ids.length) + "%" : "–");
+      refresh("c-ult", ultConfig(offers, mins));
     }
     if (st.id === "coin-play") { const n = here().length, a = coinRows().filter((c) => c.data.fake).length; set("k-ans", a + " / " + n); setProgress("bar", a, n); }
     if (st.id === "coin-results") {
@@ -395,6 +447,12 @@
             S.updateDoc("groups/" + g.id, { ["p." + rk(r) + "." + b.id]: pts });
           });
         }
+      }
+    }
+    if (s.game === "ult" && s.phase === "play") {
+      for (const b of bots) {
+        const offer = [5, 5, 5, 4, 4, 3, 2, 1, 6][Math.floor(Math.random() * 9)], mao = [0, 1, 2, 3, 3, 4, 4, 5][Math.floor(Math.random() * 8)];
+        later(() => S.setDoc("ult/" + b.id, { offer, mao, lobby: s.lobby }, true));
       }
     }
     if (s.game === "coin" && s.phase === "play") {
