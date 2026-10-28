@@ -8,7 +8,9 @@ Live classroom games for Microeconomic Analysis I. Students play on their phones
 - `L4/` – Week 4: public goods game and "Fake a coin".
   - Students: `https://<username>.github.io/ECN6019/L4/`
   - Dashboard: `https://<username>.github.io/ECN6019/L4/dashboard.html`
-- `L5/`, `L6/`, … – later weeks, added the same way. Each week's folder keeps its own data (the folder name is the data key), so weeks never mix.
+- `L5/` – Week 5: "Run your own stall" (price-taking firms, p = MC, shutdown, market price).
+  - Students: `https://<username>.github.io/ECN6019/L5/` · Dashboard: `…/L5/dashboard.html`
+- `L6/`, … – later weeks, added the same way. Each week's folder keeps its own data (the folder name is the data key), so weeks never mix.
 - `index.html` – a simple landing page linking the weeks (add a line when you add a week).
 - `firestore.rules` – paste into Firebase once (Firestore → Rules).
 

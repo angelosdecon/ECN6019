@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 5: run your own stall – Dashboard</title>
+<link rel="stylesheet" href="../shared/style.css">
+<style>
+  .lb { width: 100%; border-collapse: collapse; font-size: 20px; }
+  .lb td, .lb th { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+  .lb td.num, .lb th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .lb tr:first-child td { font-weight: 700; }
+  .types { width: 100%; border-collapse: collapse; font-size: 19px; }
+  .types td, .types th { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+  .types td.num, .types th.num { text-align: right; }
+  .banner { font-size: 22px; padding: 12px 18px; border-radius: 12px; background: var(--yellow-soft); border: 1px solid #f3e2b0; margin: 10px 0 14px; }
+</style>
+</head>
+<body class="dash">
+  <div class="band">
+    <div><div class="brand">Week 5: run your own stall</div><div class="sub" id="modname"></div></div>
+    <div style="display:flex;gap:10px;align-items:center"><span id="demoflag"></span><span id="joined" class="pill"></span></div>
+  </div>
+  <main><div class="stage" id="stage"></div></main>
+  <div class="controls" id="controls">
+    <button id="back">◀ Back</button>
+    <button class="primary" id="next">Next ▶</button>
+    <div class="grow"><select id="steps" aria-label="Jump to step"></select></div>
+    <button id="bots" class="hidden">+ 16 simulated students</button>
+    <button id="newSession" title="Start a new session: everyone re-joins">New session</button>
+  </div>
+
+  <script src="../shared/config.js"></script>
+  <script src="../shared/lib/firebase-app-compat.js"></script>
+  <script src="../shared/lib/firebase-firestore-compat.js"></script>
+  <script src="../shared/lib/chart.umd.min.js"></script>
+  <script src="../shared/lib/qrcode.js"></script>
+  <script src="../shared/store.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>
