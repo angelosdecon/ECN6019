@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Week 6: monopoly workout</title>
+<link rel="stylesheet" href="../shared/style.css">
+<style>
+  .opts { display: grid; gap: 10px; margin: 12px 0; }
+  .opt { font-size: 19px; padding: 14px; text-align: left; border-radius: 12px; }
+  .opt.right { background: #e3f4ea; border-color: var(--ok); color: #1e6b3d; font-weight: 700; }
+  .opt.wrong { background: #fbe6e3; border-color: var(--warn); color: var(--warn); font-weight: 700; }
+  .opt.dim { opacity: 0.45; }
+  .okcard { background: #eef8f2; border-color: #bfe3cc; }
+  .nocard { background: #fdf1ef; border-color: #f2c9c2; }
+  .chip.cur { background: var(--yellow); color: #333; }
+  .chip.okc { background: var(--ok); color: #fff; }
+  .chip.noc { background: var(--warn); color: #fff; }
+  .card p { margin: 8px 0 0; }
+</style>
+</head>
+<body class="student">
+  <div class="band">
+    <div><div class="brand">Week 6: monopoly workout</div><div class="sub" id="modname"></div></div>
+    <div id="status" class="small muted"></div>
+  </div>
+  <main id="view"><p class="muted">Loading…</p></main>
+
+  <script src="../shared/config.js"></script>
+  <script src="../shared/lib/firebase-app-compat.js"></script>
+  <script src="../shared/lib/firebase-firestore-compat.js"></script>
+  <script src="../shared/store.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/student.js"></script>
+</body>
+</html>
