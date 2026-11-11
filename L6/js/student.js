@@ -66,7 +66,8 @@
         const dots = steps.map((_, k) => { const a = r[ex.key + k] && r[ex.key + k].nx ? r[ex.key + k] : null; return `<span class="chip ${a ? (a.ok ? "okc" : "noc") : k === i ? "cur" : "empty"}">${a ? (a.ok ? "✓" : "✗") : k + 1}</span>`; }).join("");
         let body = `<div class="small muted">${ex.title} · step ${i + 1} of ${steps.length}</div>
           <h2 style="margin-top:4px">${s.title}</h2><div class="rule"></div>
-          <div class="card soft small">${steps[0].intro}</div>
+          <div class="card soft small">${steps[0].intro}${i ? `<div class="known"><b>What we know so far</b><ul>${steps.slice(0, i).map((x) => `<li>${x.fact}</li>`).join("")}</ul></div>` : ""}</div>
+          ${ex.key === "m" ? monoGraph(B.monoSet(pid), i + (picked ? 1 : 0)) : ""}
           <p>${s.q}</p>`;
         if (!picked) {
           body += `<div class="opts">${s.options.map((o) => `<button class="opt" data-k="${o.key}">${o.label}</button>`).join("")}</div>`;
@@ -84,6 +85,37 @@
     lastSig = sig; view.innerHTML = html;
     view.querySelectorAll(".opt[data-k]").forEach((b) => (b.onclick = () => pick(b.dataset.k)));
     const nx = document.getElementById("next"); if (nx) nx.onclick = next;
+  }
+
+  // The monopoly diagram, drawn to scale with the student's own numbers.
+  // It fills in as the steps are completed: MR, then Q_m, P_m, the profit rectangle and the deadweight-loss triangle.
+  function monoGraph(set, level) {
+    const { a, b, c } = set, Qd = a / b, Q = (a - c) / (2 * b), P = (a + c) / 2, Qc = (a - c) / b;
+    const W = 320, H = 246, L = 34, T = 14, R = 300, Bt = 200;
+    const x = (q) => L + (q / (Qd * 1.08)) * (R - L), y = (p) => Bt - (p / (a * 1.08)) * (Bt - T);
+    const n = (v) => B.num(v), BLUE = "#3333b3", ORANGE = "#d9711f", GREY = "#9a9a9a";
+    let s = `<svg viewBox="0 0 ${W} ${H}" class="mgraph" role="img" aria-label="Monopoly diagram">`;
+    if (level >= 4) s += `<rect x="${x(0)}" y="${y(P)}" width="${x(Q) - x(0)}" height="${y(c) - y(P)}" fill="#2e9e5b" opacity="0.22"/>
+      <rect x="${L}" y="${H - 12}" width="10" height="10" fill="#2e9e5b" opacity="0.35"/><text x="${L + 14}" y="${H - 3}" font-size="11" fill="#1e6b3d">profit £${n((P - c) * Q)}</text>`;
+    if (level >= 5) s += `<polygon points="${x(Q)},${y(P)} ${x(Q)},${y(c)} ${x(Qc)},${y(c)}" fill="#c0392b" opacity="0.25"/>
+      <rect x="${L + 120}" y="${H - 12}" width="10" height="10" fill="#c0392b" opacity="0.4"/><text x="${L + 134}" y="${H - 3}" font-size="11" fill="#a02b1f">deadweight loss £${n(0.5 * (P - c) * (Qc - Q))}</text>`;
+    s += `<line x1="${L}" y1="${Bt}" x2="${R + 10}" y2="${Bt}" stroke="#333"/><line x1="${L}" y1="${Bt}" x2="${L}" y2="${T - 6}" stroke="#333"/>
+      <text x="${R + 10}" y="${Bt + 14}" font-size="11" text-anchor="end">Q</text><text x="${L - 6}" y="${T - 2}" font-size="11" text-anchor="end">P</text>
+      <line x1="${x(0)}" y1="${y(a)}" x2="${x(Qd)}" y2="${y(0)}" stroke="${GREY}" stroke-width="2.5"/>
+      <text x="${x(Qd) - 4}" y="${y(0) - 6}" font-size="11" text-anchor="end" fill="#666">D</text>
+      <line x1="${L}" y1="${y(c)}" x2="${R}" y2="${y(c)}" stroke="${BLUE}" stroke-width="2"/>
+      <text x="${R}" y="${y(c) - 5}" font-size="11" text-anchor="end" fill="${BLUE}">MC = AC</text>
+      <text x="${L - 4}" y="${y(c) + 4}" font-size="10" text-anchor="end">${c}</text>
+      <text x="${L - 4}" y="${y(a) + 4}" font-size="10" text-anchor="end">${a}</text>`;
+    if (level >= 1) s += `<line x1="${x(0)}" y1="${y(a)}" x2="${x(Qd / 2)}" y2="${y(0)}" stroke="${ORANGE}" stroke-width="2"/>
+      <text x="${x(Qd / 2) + 4}" y="${y(0) - 6}" font-size="11" fill="${ORANGE}">MR</text>`;
+    if (level >= 2) s += `<line x1="${x(Q)}" y1="${y(c)}" x2="${x(Q)}" y2="${Bt}" stroke="#777" stroke-dasharray="3 3"/>
+      <circle cx="${x(Q)}" cy="${y(c)}" r="3.5" fill="${ORANGE}"/><text x="${x(Q)}" y="${Bt + 13}" font-size="10" text-anchor="middle">Q<tspan font-size="8" dy="2">m</tspan><tspan dy="-2"> = ${n(Q)}</tspan></text>`;
+    if (level >= 3) s += `<line x1="${L}" y1="${y(P)}" x2="${x(Q)}" y2="${y(P)}" stroke="#777" stroke-dasharray="3 3"/><line x1="${x(Q)}" y1="${y(P)}" x2="${x(Q)}" y2="${y(c)}" stroke="#777" stroke-dasharray="3 3"/>
+      <circle cx="${x(Q)}" cy="${y(P)}" r="3.5" fill="${BLUE}"/><text x="${L - 4}" y="${y(P) + 4}" font-size="10" text-anchor="end" font-weight="700">${n(P)}</text>`;
+    if (level >= 5) s += `<line x1="${x(Qc)}" y1="${y(c)}" x2="${x(Qc)}" y2="${Bt}" stroke="#777" stroke-dasharray="3 3"/>
+      <text x="${x(Qc) + (x(Qc) - x(Q) < 55 ? 14 : 0)}" y="${Bt + (x(Qc) - x(Q) < 55 ? 25 : 13)}" font-size="10" text-anchor="middle">Q<tspan font-size="8" dy="2">c</tspan><tspan dy="-2"> = ${n(Qc)}</tspan></text>`;
+    return s + `</svg>`;
   }
 
   // The first answer is saved straight away (so the dashboard sees it); "Next" just moves on.
