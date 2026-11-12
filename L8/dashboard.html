@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 8: game theory – Dashboard</title>
+<link rel="stylesheet" href="../shared/style.css">
+<style>
+  .types { width: 100%; border-collapse: collapse; font-size: 19px; }
+  .types td, .types th { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+  .types td.num, .types th.num { text-align: right; }
+  .steprow { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-top: 10px; }
+  .stepbox { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
+  .stepbox .v { font-size: 38px; font-weight: 700; color: var(--blue); }
+  .stepbox .l { color: var(--muted); font-size: 15px; }
+  .stepbox .bar { height: 8px; background: #eee; border-radius: 4px; margin-top: 8px; overflow: hidden; }
+  .stepbox .bar span { display: block; height: 100%; background: var(--blue); }
+  .winner { font-size: 26px; font-weight: 700; color: var(--blue); }
+  .ladder { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 26px; margin: 18px 0; }
+  .ladder .s { padding: 10px 16px; border-radius: 12px; background: var(--blue-soft); color: var(--blue); font-weight: 700; }
+  .ladder .s.zero { background: var(--yellow); color: #333; }
+  .ladder .arr { color: var(--muted); }
+</style>
+</head>
+<body class="dash">
+  <div class="band">
+    <div><div class="brand">Week 8: game theory</div><div class="sub" id="modname"></div></div>
+    <div style="display:flex;gap:10px;align-items:center"><span id="demoflag"></span><span id="joined" class="pill"></span></div>
+  </div>
+  <main><div class="stage" id="stage"></div></main>
+  <div class="controls" id="controls">
+    <button id="back">◀ Back</button>
+    <button class="primary" id="next">Next ▶</button>
+    <div class="grow"><select id="steps" aria-label="Jump to step"></select></div>
+    <button id="bots" class="hidden">+ 16 simulated students</button>
+    <button id="newSession" title="Start a new session: everyone re-joins">New session</button>
+  </div>
+
+  <script src="../shared/config.js"></script>
+  <script src="../shared/lib/firebase-app-compat.js"></script>
+  <script src="../shared/lib/firebase-firestore-compat.js"></script>
+  <script src="../shared/lib/chart.umd.min.js"></script>
+  <script src="../shared/lib/qrcode.js"></script>
+  <script src="../shared/store.js"></script>
+  <script src="js/common.js?v=1"></script>
+  <script src="js/dashboard.js?v=1"></script>
+</body>
+</html>

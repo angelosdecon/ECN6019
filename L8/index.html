@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Week 8: game theory</title>
+<link rel="stylesheet" href="../shared/style.css">
+<style>
+  .okcard { background: #eef8f2; border-color: #bfe3cc; }
+  .nocard { background: #fdf1ef; border-color: #f2c9c2; }
+  .card p { margin: 8px 0 0; }
+  .chip.cur { background: var(--yellow); color: #333; }
+  .chip.okc { background: var(--ok); color: #fff; }
+  .chip.noc { background: var(--warn); color: #fff; }
+  .p1 { color: var(--blue); font-weight: 600; }
+  .p2 { color: #c4621a; font-weight: 600; }
+  table.pm { border-collapse: separate; border-spacing: 5px; margin: 6px auto; }
+  table.pm th { font-size: 13px; font-weight: 600; padding: 2px 4px; }
+  table.pm th.p1 { text-align: right; }
+  table.pm td { padding: 0; }
+  button.cell { width: 84px; height: 54px; font-size: 19px; padding: 0; border-radius: 10px; border: 2px solid var(--line); }
+  button.cell.on { border-color: var(--blue); background: var(--blue-soft); box-shadow: 0 0 0 2px var(--blue) inset; }
+  button.cell.ne { background: #ffe9a8; border-color: #e5b72e; }
+  button.cell.good { box-shadow: 0 0 0 3px var(--ok) inset; }
+  button.cell.bad { box-shadow: 0 0 0 3px var(--warn) inset; }
+  button.cell:disabled { color: var(--text); cursor: default; }
+  button.chosen { background: var(--blue-soft); border-color: var(--blue); color: var(--blue); font-weight: 600; }
+  @media (max-width: 380px) { button.cell { width: 74px; height: 50px; font-size: 17px; } }
+</style>
+</head>
+<body class="student">
+  <div class="band">
+    <div><div class="brand">Week 8: game theory</div><div class="sub" id="modname"></div></div>
+    <div id="status" class="small muted"></div>
+  </div>
+  <main id="view"><p class="muted">Loading…</p></main>
+
+  <script src="../shared/config.js"></script>
+  <script src="../shared/lib/firebase-app-compat.js"></script>
+  <script src="../shared/lib/firebase-firestore-compat.js"></script>
+  <script src="../shared/store.js"></script>
+  <script src="js/common.js?v=1"></script>
+  <script src="js/student.js?v=1"></script>
+</body>
+</html>
