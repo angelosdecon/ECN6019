@@ -110,8 +110,8 @@ window.BL = (function () {
         why: `m<sub>A</sub> = p × ${ax} + 1 × ${ay} = <b>${iA}</b> and m<sub>B</sub> = p × ${bx} + 1 × ${by} = <b>${iB}</b>. Income depends on the price, because the consumers earn it by selling what they own.`,
         tips: { "price on the wrong good": "p is the price of x, so it multiplies the units of x, the first number in the endowment.", "ignored the price": "Goods are worth their price: x is worth p each, y is worth 1 each." } },
       { id: "xA", title: "A's demand for x", fact: `x<sub>A</sub> = ${xAexpr}`,
-        q: `With u = x<sup>a</sup>y<sup>1−a</sup>, the consumer spends the share a of her income on x. What is A's demand for x?`,
-        hint: `Spending on x is a × m. Each unit of x costs p, so divide the spending by p. For A, a = ${fs(a)}.`,
+        q: `What is A's Marshallian demand for x?`,
+        hint: `Remember: with Cobb-Douglas utility u = x<sup>a</sup>y<sup>1−a</sup>, the Marshallian demands are x = a·m/p<sub>x</sub> and y = (1 − a)·m/p<sub>y</sub>. For A, a = ${fs(a)}, m<sub>A</sub> = ${iA} and p<sub>x</sub> = p, so you are looking for x<sub>A</sub> = a·m<sub>A</sub>/p.`,
         options: opts([
           { label: `x<sub>A</sub> = ${xAexpr}`, tag: "ok" },
           { label: `x<sub>A</sub> = ${fs(a1)}(${iA})/p`, tag: "wrong share" },
@@ -122,8 +122,8 @@ window.BL = (function () {
         why: `A spends ${fs(a)} of her income on x, and x costs p: x<sub>A</sub> = a·m<sub>A</sub>/p = <b>${xAexpr}</b>. (y gets the rest: y<sub>A</sub> = ${fs(a1)}(${iA}).)`,
         tips: { "wrong share": `That is the share spent on y (1 − a = ${fs(a1)}). The exponent on x is ${fs(a)}.`, "forgot to divide by p": "That is spending on x in £. To get units, divide by the price p." } },
       { id: "xB", title: "B's demand for x", fact: `x<sub>B</sub> = ${xBexpr}`,
-        q: "Now B, with the same rule. What is B's demand for x?",
-        hint: `B's share on x is the exponent on x in u<sub>B</sub>: b = ${fs(b)}. B's income is ${iB}.`,
+        q: "Now B. What is B's Marshallian demand for x?",
+        hint: `Remember: with Cobb-Douglas utility u = x<sup>b</sup>y<sup>1−b</sup>, the Marshallian demand for x is x = b·m/p<sub>x</sub>. For B, b = ${fs(b)} (the exponent on x in u<sub>B</sub>), m<sub>B</sub> = ${iB} and p<sub>x</sub> = p, so you are looking for x<sub>B</sub> = b·m<sub>B</sub>/p.`,
         options: opts([
           { label: `x<sub>B</sub> = ${xBexpr}`, tag: "ok" },
           { label: `x<sub>B</sub> = ${fs(b1)}(${iB})/p`, tag: "wrong share" },
