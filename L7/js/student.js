@@ -1,5 +1,5 @@
-// Week 7 student page: "Be the market". Each phone is a trader (a Baker or an Orchard owner).
-// When the auctioneer opens a round at a price, the trader picks a bundle on her budget line and sends her order.
+// Week 7 student page: a self-paced Walrasian-equilibrium exercise with hints and feedback after every step.
+// The phone waits until the lecturer opens the exercise on the dashboard; after that each student goes at their own pace.
 (function () {
   const S = window.Store, B = window.BL, cfg = window.BIASLAB_CONFIG || {};
   const view = document.getElementById("view");
@@ -9,7 +9,6 @@
   const ID_KEY = "ecn-pid-" + S.root;
   let pid = idStore.getItem(ID_KEY);
   if (!pid) { pid = B.newId(); idStore.setItem(ID_KEY, pid); }
-  const T = B.typeOf(pid);
 
   let hiddenAt = null;
   document.addEventListener("visibilitychange", () => {
@@ -20,130 +19,162 @@
   window.addEventListener("pageshow", (e) => { if (e.persisted) location.reload(); });
 
   const st = { state: null, mine: undefined };
-  const ui = { x: null, round: null, sending: false };
+  const ui = { picked: null, hint: null };   // option just picked; step whose hint is open
   S.onDoc("", (d) => { st.state = d; register(); render(); });
-  S.onDoc("tr/" + pid, (d) => { st.mine = d; register(); render(); });
+  S.onDoc("ans/" + pid, (d) => { st.mine = d; register(); render(); });
 
   const lobby = () => st.state && st.state.lobby;
+  const open = () => st.state && ["work", "results", "end"].includes(st.state.phase);
   const mine = () => (st.mine && st.mine.lobby === lobby() ? st.mine : null);
-  const rk = (r) => "r" + r;
+  const NW = B.EX[0].steps(pid).length, NB = B.EX[1].steps(pid).length;
 
   function register() {
     if (!lobby() || st.mine === undefined) return;
     if (mine() || register.pending === lobby()) return;
     register.pending = lobby();
-    S.setDoc("tr/" + pid, { lobby: lobby(), type: T.key, joinedAt: Date.now(), r: {} });
+    S.setDoc("ans/" + pid, { lobby: lobby(), joinedAt: Date.now(), r: {} });
   }
 
-  const pl = (v, one, many) => B.num(v, 2) + " " + (Math.abs(v - 1) < 1e-9 ? one : many || one + "s");
-  const typeCard = () => `<div class="card soft"><div style="font-size:22px"><span style="font-size:30px">${T.icon}</span> You are a <b style="color:${T.color}">${T.name}</b></div>
-    <p>${T.owns}<br>${T.likes}</p></div>`;
+  // Where is this student? The first exercise/step without an answer.
+  function position() {
+    const r = (mine() && mine().r) || {};
+    for (const ex of B.EX) {
+      const steps = ex.steps(pid);
+      for (let i = 0; i < steps.length; i++) if (!r[ex.key + i] || !r[ex.key + i].nx) return { ex, steps, i, r };
+    }
+    return { done: true, r };
+  }
+  function score(r, key, n) { let ok = 0, done = 0; for (let i = 0; i < n; i++) { const a = r[key + i]; if (a) { done++; if (a.ok) ok++; } } return { ok, done }; }
 
   let lastSig = "";
   function render() {
-    const s = st.state;
     let sig, html;
     if (!lobby()) { sig = "wait"; html = `<h2>Welcome</h2><div class="rule"></div><p>Waiting for the lecturer to open the session…</p>`; }
-    else if (s.phase === "lobby") {
-      sig = "lobby" + lobby();
-      html = `<h2>You're in</h2><div class="rule"></div>${typeCard()}
-        <p>I am the <b>auctioneer</b>. I will call out a price for apples (a loaf of bread always costs £1). At that price, you choose what to buy and sell.</p>
-        <p class="muted small">Keep this page open. The first round starts soon.</p>`;
-    } else if (s.phase === "round") {
-      const r = s.round, p = s.price, sent = mine() && mine().r && mine().r[rk(r)];
-      if (s.open) {
-        if (ui.round !== r) { ui.round = r; ui.x = sent ? sent.x : Math.min(T.wx, B.income(T, p) / p); }
-        sig = "open" + r + "|" + (sent ? "s" + sent.x : "n") + (ui.sending ? "w" : "");
-        html = roundOpen(r, p, sent);
+    else if (!open()) { sig = "lobby" + lobby(); html = `<h2>You're in</h2><div class="rule"></div><p>Keep this page open. The exercise starts when the lecturer opens it.</p><div class="card soft small">A Walrasian equilibrium, step by step, with your own numbers. Stuck? Tap <b>Hint</b>. After each answer you see straight away whether it is right, and why.</div>`; }
+    else {
+      const pos = position();
+      if (pos.done) {
+        const w = score(pos.r, "w", NW), b = score(pos.r, "b", NB);
+        sig = "done" + w.ok + b.ok;
+        html = `<h2>Well done!</h2><div class="rule"></div>
+          ${graph(B.econ(pid), 99)}
+          <div class="card soft"><p><b>Walrasian equilibrium:</b> ${w.ok} / ${NW} right first time</p><p><b>Bonus (efficiency):</b> ${b.ok} / ${NB} right first time</p></div>
+          <p class="muted">Look up at the screen for how the class did. The same steps are in the lecture notes, and in Problem Set 7, Question 4.</p>`;
       } else {
-        const h = (s.hist || []).find((e) => e.r === r);
-        sig = "closed" + r + (h ? "h" : "") + (sent ? "s" : "");
-        html = roundClosed(r, p, sent, h);
+        const { ex, steps, i, r } = pos, s = steps[i], saved = r[ex.key + i];
+        const picked = saved ? { key: saved.key } : ui.picked && ui.picked.step === ex.key + i ? ui.picked : null;
+        const hintOpen = ui.hint === ex.key + i;
+        sig = ex.key + i + (picked ? picked.key : "") + (hintOpen ? "h" : "");
+        const sc = score(r, ex.key, steps.length);
+        const level = ex.key === "w" ? i + (picked ? 1 : 0) : 99;
+        const dots = steps.map((_, k) => { const a = r[ex.key + k] && r[ex.key + k].nx ? r[ex.key + k] : null; return `<span class="chip ${a ? (a.ok ? "okc" : "noc") : k === i ? "cur" : "empty"}">${a ? (a.ok ? "✓" : "✗") : k + 1}</span>`; }).join("");
+        let body = `<div class="small muted">${ex.title} · step ${i + 1} of ${steps.length}</div>
+          <h2 style="margin-top:4px">${s.title}</h2><div class="rule"></div>
+          <div class="card soft small">${steps[0].intro}${i ? `<div class="known"><b>What we know so far</b><ul>${steps.slice(0, i).map((x) => `<li>${x.fact}</li>`).join("")}</ul></div>` : ""}</div>
+          ${graph(B.econ(pid), level)}
+          <p>${s.q}</p>`;
+        if (!picked) {
+          body += hintOpen ? `<div class="hint">💡 ${s.hint}</div>` : `<button class="hintbtn" id="hint">💡 Hint</button>`;
+          body += `<div class="opts">${s.options.map((o) => `<button class="opt" data-k="${o.key}">${o.label}</button>`).join("")}</div>`;
+        } else {
+          const o = s.options.find((x) => x.key === picked.key), right = s.options.find((x) => x.correct);
+          body += `<div class="opts">${s.options.map((x) => `<button class="opt ${x.correct ? "right" : x.key === o.key ? "wrong" : "dim"}" disabled>${x.label}</button>`).join("")}</div>
+            <div class="card ${o.correct ? "okcard" : "nocard"}"><b>${o.correct ? "✓ Right." : "✗ Not quite. The answer is " + right.label + "."}</b>
+            ${!o.correct && s.tips && s.tips[o.tag] ? `<p>${s.tips[o.tag]}</p>` : ""}<p>${s.why}</p></div>
+            <button class="primary full" id="next">${i + 1 < steps.length ? "Next step ▶" : ex.key === "w" ? "Bonus question ▶" : "Finish ▶"}</button>`;
+        }
+        html = `<div class="seq">${dots}</div>${body}<p class="small muted center">${sc.ok} right so far</p>`;
       }
-    } else if (s.phase === "reveal") {
-      sig = "reveal" + (s.eq ? s.eq.p : "");
-      html = reveal(s);
-    } else {
-      sig = "end"; html = `<h2>Thank you</h2><div class="rule"></div><p>The market found its price. Look up at the screen.</p>`;
     }
     if (sig === lastSig) return;
     lastSig = sig; view.innerHTML = html;
-    wire();
+    view.querySelectorAll(".opt[data-k]").forEach((b) => (b.onclick = () => pick(b.dataset.k)));
+    const nx = document.getElementById("next"); if (nx) nx.onclick = next;
+    const hb = document.getElementById("hint"); if (hb) hb.onclick = showHint;
   }
 
-  function roundOpen(r, p, sent) {
-    const m = B.income(T, p), max = Math.floor((m / p) / B.STEP + 1e-9) * B.STEP;
-    return `<div class="small muted">Round ${r}</div>
-      <div class="pricebox">1 apple costs <b>${B.money(p)}</b><span class="small muted"> · a loaf of bread £1</span></div>
-      <div class="card soft small"><span style="font-size:20px">${T.icon}</span> <b>${T.name}</b>: ${T.owns} ${T.likes}<br>
-        At this price your things are worth <b>${B.money(m)}</b>${T.wx ? ` (${T.wx} apples × ${B.money(p)})` : ` (${T.wy} loaves × £1)`}.</div>
-      <p style="margin-bottom:4px"><b>How many apples do you want to end up with?</b> Bread is whatever money is left.</p>
-      <input type="range" id="sx" min="0" max="${B.num(max, 1)}" step="${B.STEP}" value="${B.num(Math.min(ui.x, max), 1)}">
-      <div class="bundle">
-        <div><div class="v" id="vx"></div><div class="l">apples 🍎</div></div>
-        <div><div class="v" id="vy"></div><div class="l">loaves 🍞</div></div>
-        <div><div class="v" id="vu" style="color:var(--ok)"></div><div class="l">happiness</div></div>
-      </div>
-      <div class="meter"><span id="um"></span></div>
-      <p class="small center" id="trade"></p>
-      <button class="primary full big" id="send" ${ui.sending ? "disabled" : ""}>${sent ? "Update my order" : "Send my order"}</button>
-      <p class="small muted center" id="sentnote">${sent ? `✓ Order sent: ${B.num(sent.x, 1)} apples, ${B.num(sent.y, 1)} loaves. You can change it until the round closes.` : "Move the slider to make yourself as happy as you can, then send."}</p>`;
-  }
-
-  // Update the numbers as the slider moves (without redrawing the page).
-  function wire() {
-    const sx = document.getElementById("sx");
-    if (sx) {
-      const s = st.state, p = s.price, m = B.income(T, p);
-      const umax = B.points(T, B.best(T, p).x, B.best(T, p).y);
-      const show = () => {
-        const x = Number(sx.value), y = Math.max(0, m - p * x);
-        ui.x = x;
-        document.getElementById("vx").textContent = B.num(x, 1);
-        document.getElementById("vy").textContent = B.num(y, 1);
-        const u = B.points(T, x, y);
-        document.getElementById("vu").textContent = B.num(u, 1);
-        document.getElementById("um").style.width = Math.min(100, (100 * u) / Math.max(umax, 0.1)) + "%";
-        const dx = x - T.wx, dy = y - T.wy;
-        document.getElementById("trade").innerHTML = Math.abs(dx) < 1e-9 ? "No trade: you keep what you own." :
-          dx > 0 ? `You <b>buy ${B.num(dx, 1)} apples</b> and pay with <b>${B.num(-dy, 1)} loaves</b>.`
-                 : `You <b>sell ${B.num(-dx, 1)} apples</b> for <b>${B.num(dy, 1)} loaves</b>.`;
-      };
-      sx.oninput = show; show();
+  // The Edgeworth box, drawn with the student's own numbers.
+  // It fills in as the steps are done: endowment E → budget line at p* → A's bundle → the equilibrium W with
+  // both indifference curves tangent to the budget line.
+  function graph(e, level) {
+    const { X, Y, ax, ay, P } = e, a = e.a.n / e.a.d, b = e.b.n / e.b.d;
+    const W = 330, H = 292, L = 40, T = 26, BW = 236, BH = 210;
+    const x = (u) => L + (u / X) * BW, y = (v) => T + BH - (v / Y) * BH;
+    const n = (v) => B.num(v), BLUE = "#3333b3", ORANGE = "#d9711f", GREEN = "#2e9e5b", GREY = "#777";
+    let s = `<svg viewBox="0 0 ${W} ${H}" class="egraph" role="img" aria-label="Edgeworth box">
+      <defs><clipPath id="bx"><rect x="${x(0)}" y="${y(Y)}" width="${BW}" height="${BH}"/></clipPath></defs>
+      <rect x="${x(0)}" y="${y(Y)}" width="${BW}" height="${BH}" fill="none" stroke="#333" stroke-width="1.4"/>
+      <text x="${x(0) - 4}" y="${y(0) + 14}" font-size="11" text-anchor="end">O<tspan font-size="8" dy="2">A</tspan></text>
+      <text x="${x(X) + 4}" y="${y(Y) - 4}" font-size="11">O<tspan font-size="8" dy="2">B</tspan></text>
+      <text x="${x(X / 2)}" y="${y(0) + 26}" font-size="11" text-anchor="middle">x (total ${X}) →</text>
+      <text x="${x(0) - 22}" y="${y(Y / 2)}" font-size="11" text-anchor="middle" transform="rotate(-90 ${x(0) - 22} ${y(Y / 2)})">y (total ${Y})</text>`;
+    // tick labels for A
+    s += `<text x="${x(ax)}" y="${y(0) + 13}" font-size="10" text-anchor="middle" fill="${GREY}">${ax}</text>
+      <text x="${x(0) - 4}" y="${y(ay) + 4}" font-size="10" text-anchor="end" fill="${GREY}">${ay}</text>
+      <line x1="${x(ax)}" y1="${y(ay)}" x2="${x(ax)}" y2="${y(0)}" stroke="#bbb" stroke-dasharray="3 3"/>
+      <line x1="${x(0)}" y1="${y(ay)}" x2="${x(ax)}" y2="${y(ay)}" stroke="#bbb" stroke-dasharray="3 3"/>`;
+    if (level >= 5) {
+      // budget line through E with slope −p*: y = ay + P (ax − x)
+      const pts = [0, X].map((u) => `${x(u)},${y(ay + P * (ax - u))}`).join(" ");
+      s += `<polyline points="${pts}" stroke="#333" stroke-width="2" fill="none" clip-path="url(#bx)"/>`;
+      // label the line where it leaves the box on the side with more room
+      let lx = ax < X / 2 ? Math.min(X, ax + (Y + 0 - ay) / -P) : ax - 0.3 * ax, ly;
+      lx = ax < X / 2 ? ax + 0.55 * (X - ax) : 0.45 * ax; ly = ay + P * (ax - lx);
+      if (ly > 0.08 * Y && ly < 0.92 * Y) s += `<text x="${x(lx) + 6}" y="${y(ly) - 8}" font-size="10" fill="#333" paint-order="stroke" stroke="#fff" stroke-width="3">budget line, slope −${n(P)}</text>`;
     }
-    const send = document.getElementById("send");
-    if (send) send.onclick = async () => {
-      const s = st.state; if (!s || s.phase !== "round" || !s.open) return;
-      const p = s.price, m = B.income(T, p), x = Number(document.getElementById("sx").value), y = Math.max(0, m - p * x);
-      ui.sending = true; render();
-      await S.updateDoc("tr/" + pid, { lobby: lobby(), type: T.key, ["r." + rk(s.round)]: { p, x, y, t: Date.now() } });
-      ui.sending = false; lastSig = ""; render();
-    };
-  }
-
-  function roundClosed(r, p, sent, h) {
-    let market = "";
-    if (h) {
-      const dir = Math.abs(h.zx) < 0.05 * Math.max(1, h.avail) ? `<b>That's (almost) it: the apple market clears.</b>` :
-        h.zx > 0 ? `More apples wanted than there are: <b>excess demand</b>. The price of apples should <b>rise</b>.`
-                 : `Fewer apples wanted than there are: <b>excess supply</b>. The price of apples should <b>fall</b>.`;
-      market = `<div class="card"><b>The market at ${B.money(p)}</b>
-        <p>Apples wanted: <b>${B.num(h.want, 1)}</b> · apples available: <b>${B.num(h.avail, 1)}</b></p><p>${dir}</p></div>`;
+    if (level >= 7) {
+      // indifference curves through W, tangent to the budget line
+      const UA = B.util(a, e.xA, e.yA), UB = B.util(b, e.xB, e.yB), ptsA = [], ptsB = [];
+      for (let k = 1; k < 120; k++) {
+        const u = (k / 120) * X;
+        const vA = Math.pow(UA / Math.pow(u, a), 1 / (1 - a));
+        if (vA <= Y * 1.5) ptsA.push(`${x(u)},${y(vA)}`);
+        const vB = Y - Math.pow(UB / Math.pow(X - u, b), 1 / (1 - b));
+        if (vB >= -Y * 0.5) ptsB.push(`${x(u)},${y(vB)}`);
+      }
+      s += `<polyline points="${ptsA.join(" ")}" stroke="${BLUE}" stroke-width="2" fill="none" clip-path="url(#bx)"/>
+        <polyline points="${ptsB.join(" ")}" stroke="${ORANGE}" stroke-width="2" fill="none" clip-path="url(#bx)"/>`;
     }
-    const me = sent ? `<p>You ordered <b>${B.num(sent.x, 1)} apples</b> and <b>${B.num(sent.y, 1)} loaves</b> (happiness ${B.num(B.points(T, sent.x, sent.y), 1)}).</p>`
-                    : `<p class="muted">You did not send an order this round.</p>`;
-    return `<div class="small muted">Round ${r} · closed</div><h2>Look at the screen</h2><div class="rule"></div>${me}${market}
-      <p class="small muted">The auctioneer will call a new price.</p>`;
+    if (level >= 6) {
+      s += `<line x1="${x(e.xA)}" y1="${y(e.yA)}" x2="${x(e.xA)}" y2="${y(0)}" stroke="${BLUE}" stroke-dasharray="3 3"/>
+        <line x1="${x(0)}" y1="${y(e.yA)}" x2="${x(e.xA)}" y2="${y(e.yA)}" stroke="${BLUE}" stroke-dasharray="3 3"/>
+        <text x="${x(e.xA)}" y="${y(0) + 13}" font-size="10" text-anchor="middle" fill="${BLUE}" font-weight="700">${n(e.xA)}</text>
+        <text x="${x(0) - 4}" y="${y(e.yA) + 4}" font-size="10" text-anchor="end" fill="${BLUE}" font-weight="700">${n(e.yA)}</text>
+        <circle cx="${x(e.xA)}" cy="${y(e.yA)}" r="5" fill="${GREEN}"/>
+        <text x="${x(e.xA) + 8}" y="${y(e.yA) - 6}" font-size="12" font-weight="700" fill="${GREEN}">W</text>`;
+    }
+    if (level >= 7) {
+      s += `<text x="${x(e.xA)}" y="${y(Y) - 4}" font-size="10" text-anchor="middle" fill="${ORANGE}" font-weight="700">${n(e.xB)}</text>
+        <text x="${x(X) + 4}" y="${y(e.yA) + 4}" font-size="10" fill="${ORANGE}" font-weight="700">${n(e.yB)}</text>
+        <line x1="${x(e.xA)}" y1="${y(e.yA)}" x2="${x(e.xA)}" y2="${y(Y)}" stroke="${ORANGE}" stroke-dasharray="3 3"/>
+        <line x1="${x(e.xA)}" y1="${y(e.yA)}" x2="${x(X)}" y2="${y(e.yA)}" stroke="${ORANGE}" stroke-dasharray="3 3"/>`;
+    }
+    s += `<circle cx="${x(ax)}" cy="${y(ay)}" r="4.5" fill="#333"/><text x="${x(ax) + 7}" y="${y(ay) + 14}" font-size="12" font-weight="700">E</text>`;
+    // legend
+    s += `<text x="${L}" y="${H - 4}" font-size="10" fill="#555">E: endowments${level >= 6 ? " · W: equilibrium" : ""}</text>`;
+    if (level >= 7) s += `<text x="${W - 4}" y="${12}" font-size="10" text-anchor="end"><tspan fill="${BLUE}">— A</tspan> <tspan fill="${ORANGE}">— B</tspan></text>`;
+    return s + `</svg>`;
   }
 
-  function reveal(s) {
-    const eq = s.eq; if (!eq || !eq.p) return `<h2>The equilibrium</h2><div class="rule"></div><p>Look at the screen.</p>`;
-    const b = B.best(T, eq.p), u0 = B.points(T, T.wx, T.wy), u1 = B.points(T, b.x, b.y);
-    const dx = b.x - T.wx;
-    return `<h2>The equilibrium price: ${B.money(eq.p)}</h2><div class="rule"></div>
-      <div class="card soft"><span style="font-size:22px">${T.icon}</span> As a <b>${T.name}</b>, your best choice at ${B.money(eq.p)} is
-        <b>${pl(b.x, "apple")}</b> and <b>${pl(b.y, "loaf", "loaves")}</b>: you ${dx > 0 ? "buy " + pl(dx, "apple") : "sell " + pl(-dx, "apple")}.</div>
-      <p>Happiness: <b>${B.num(u0, 1)}</b> with what you owned → <b>${B.num(u1, 1)}</b> after trade. Trade makes both types better off.</p>
-      <p class="small muted">At this price everyone's best choice adds up to exactly the apples (and bread) that exist: a Walrasian equilibrium.</p>`;
+  function showHint() {
+    const pos = position(); if (pos.done) return;
+    const step = pos.ex.key + pos.i;
+    ui.hint = step; render();
+    S.updateDoc("ans/" + pid, { lobby: lobby(), ["h." + step]: true });
+  }
+  // The first answer is saved straight away (so the dashboard sees it); "Next" just moves on.
+  function pick(key) {
+    const pos = position(); if (pos.done || pos.r[pos.ex.key + pos.i]) return;
+    const s = pos.steps[pos.i], o = s.options.find((x) => x.key === key), step = pos.ex.key + pos.i;
+    ui.picked = { step, key };
+    render();
+    S.updateDoc("ans/" + pid, { lobby: lobby(), ["r." + step]: { ok: o.correct, tag: o.tag, key, t: Date.now(), nx: false } });
+  }
+  async function next() {
+    const pos = position(); if (pos.done) return;
+    const step = pos.ex.key + pos.i;
+    if (!pos.r[step]) return;
+    await S.updateDoc("ans/" + pid, { ["r." + step + ".nx"]: true });
+    ui.picked = null; ui.hint = null; window.scrollTo(0, 0); render();
   }
 })();

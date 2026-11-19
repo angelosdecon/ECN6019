@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Week 7: be the market</title>
+<link rel="stylesheet" href="../shared/style.css">
+<style>
+  .pricebox { font-size: 22px; margin: 6px 0 4px; color: var(--blue); }
+  .pricebox b { font-size: 34px; }
+  input[type=range] { height: 36px; }
+  .bundle { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center; margin: 6px 0; }
+  .bundle .v { font-size: 34px; font-weight: 700; color: var(--blue); line-height: 1.1; }
+  .bundle .l { font-size: 13px; color: var(--muted); }
+  .meter { height: 12px; background: #eee; border-radius: 999px; overflow: hidden; margin: 4px 0 2px; }
+  .meter span { display: block; height: 100%; background: var(--ok); width: 0; transition: width .1s; }
+  .card p { margin: 8px 0 0; }
+</style>
+</head>
+<body class="student">
+  <div class="band">
+    <div><div class="brand">Week 7: be the market</div><div class="sub" id="modname"></div></div>
+    <div id="status" class="small muted"></div>
+  </div>
+  <main id="view"><p class="muted">Loading…</p></main>
+
+  <script src="../shared/config.js"></script>
+  <script src="../shared/lib/firebase-app-compat.js"></script>
+  <script src="../shared/lib/firebase-firestore-compat.js"></script>
+  <script src="../shared/store.js"></script>
+  <script src="js/common.js?v=1"></script>
+  <script src="js/student.js?v=1"></script>
+</body>
+</html>

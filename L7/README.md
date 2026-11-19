@@ -1,12 +1,15 @@
-# Week 7: be the market (a Walrasian auctioneer)
+# Week 7: Walrasian workout
 
-Every phone is a trader in an exchange economy with two goods, apples and bread (bread is the numeraire: £1 a loaf).
+A self-paced exercise on the phone (like the Week 6 monopoly workout). Each phone gets its own two-consumer exchange economy (one of 16 sets; Cobb–Douglas u_A = x^a y^(1−a), u_B = x^b y^(1−b); p_x = p, p_y = 1). Every set has a whole-number price (2, 3 or 4) and whole-number bundles; none repeats the lecture example, PS7, the recording or the January 2026/2027 exams.
 
-- **Bakers** (about half the phones): own 12 loaves and no apples; utility x^½ y^½ (spend half their income on apples).
-- **Orchard owners**: own 3 apples and no bread; utility x^⅓ y^⅔ (spend a third on apples, so they always keep 1 apple).
+Steps (multiple choice, one try, a **Hint** button before answering, then ✓/✗ with the reason and a tip for the specific mistake; "What we know so far" carries the correct answers forward):
+1. Incomes (value of the endowments) → 2. A's demand for x (a·m/p) → 3. B's demand for x → 4. Excess demand z(p) → 5. p* from z(p) = 0 → 6. A's bundle → 7. B's bundle and market clearing.
+Bonus: MRS_A at the equilibrium (= p*) → what equal MRSs show (Pareto efficient, First Welfare Theorem).
 
-The lecturer is the auctioneer. On the dashboard: type a price for apples → **Open round**. Each phone shows the trader's income at that price (the value of what she owns), and a slider for how many apples to end up with; bread is the money left over, and a "happiness" meter (utility × 10) shows how good the bundle is. Students send an order (they can change it until the round closes). **Close round** shows apples wanted vs available, excess demand for apples and for bread, the Walras' law check (p × z_apples + z_bread = 0) and a suggested next price (price × wanted / available). Repeat 3–5 rounds, then **Reveal equilibrium**: the price that clears the market for the class's actual mix of types, p* = 3 × Bakers / Orchard owners (3 with equal numbers; Bakers then end with 2 apples and 6 loaves, Orchard owners with 1 apple and 6 loaves), with the price path on a chart.
+An Edgeworth box drawn with the student's numbers fills in: endowment E → budget line at p* → A's bundle W → B's bundle and both indifference curves tangent at W.
 
-Suggested opening price £1 (big excess demand). About 5 minutes. Parameters: `js/common.js`. Data: `sessions/L7/tr/*` ({lobby, type, r: {r1: {p, x, y}}}); round summaries in the session document (`hist`).
+Dashboard: 1 Join (QR) → 2 Exercise open (live % right per step, hints used) → 3 Results (% right first time, % who used a hint, most common mistake per step; bonus chart) → 4 End.
 
-Demo mode (`?demo=1`): "+ 16 simulated students" adds traders; while a round is open they answer automatically (best bundle ± 20%).
+Data: `sessions/L7/ans/*` ({lobby, r: {w0..w6, b0..b1: {ok, tag, key, t, nx}}, h: {w0: true, …}}). Parameters and wording: `js/common.js`.
+
+The earlier Week 7 game ("Be the market", a Walrasian auctioneer) is kept in `L7market/` (its own data key `L7market`).

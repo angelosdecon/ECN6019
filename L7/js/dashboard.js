@@ -1,5 +1,4 @@
-// Week 7 dashboard: "Be the market". The lecturer is the auctioneer: post a price, open a round,
-// watch the orders come in, close the round, read off excess demand, and move the price.
+// Week 7 dashboard: "Walrasian workout". Join QR, live progress, then where the class got stuck.
 (function () {
   const S = window.Store, B = window.BL, cfg = window.BIASLAB_CONFIG || {};
   const stage = document.getElementById("stage");
@@ -19,200 +18,169 @@
     return;
   }
 
-  const D = { state: null, tr: [] };
+  const STEPS = [
+    { id: "lobby", label: "Join (QR code)" },
+    { id: "work", label: "Exercise open: live progress" },
+    { id: "results", label: "Results: where did we get stuck?" },
+    { id: "end", label: "End" }
+  ];
+  $("steps").innerHTML = STEPS.map((s, i) => `<option value="${i}">${i + 1}. ${s.label}</option>`).join("");
+
+  const D = { state: null, ans: [] };
   let charts = {}, mountedKey = null;
   S.onDoc("", (d) => { D.state = d; if (!d || !d.lobby) initSession(); render(); });
-  S.onCol("tr", (a) => { D.tr = a; render(); });
+  S.onCol("ans", (a) => { D.ans = a; render(); });
 
   const lobby = () => (D.state && D.state.lobby) || null;
-  const here = () => D.tr.filter((a) => a.data.lobby === lobby());
-  const counts = (list) => ({ nA: list.filter((a) => a.data.type === "A").length, nB: list.filter((a) => a.data.type === "B").length });
-  const rk = (r) => "r" + r;
+  const here = () => D.ans.filter((a) => a.data.lobby === lobby());
+  const pct = (x) => Math.round(100 * x);
+  const curStep = () => (D.state && D.state.step) || 0;
 
   async function initSession() {
     if (initSession.done) return; initSession.done = true;
     const cur = await S.getDoc("");
-    if (!cur || !cur.lobby) await S.setDoc("", newState());
+    if (!cur || !cur.lobby) await S.setDoc("", { lobby: "L" + Date.now().toString(36), step: 0, phase: "lobby", phaseId: "init" });
   }
-  const newState = () => ({ lobby: "L" + Date.now().toString(36), phase: "lobby", round: 0, price: B.START_PRICE, open: false, hist: [], eq: null });
-
-  // ---------- one round's orders ----------
-  function roundStats(r) {
-    const orders = here().map((a) => ({ type: a.data.type, o: a.data.r && a.data.r[rk(r)] })).filter((a) => a.o);
-    const T = B.TYPES;
-    let want = 0, avail = 0, bread = 0, breadHave = 0;
-    for (const a of orders) { const t = T[a.type]; want += a.o.x; avail += t.wx; bread += a.o.y; breadHave += t.wy; }
-    const c = { nA: orders.filter((a) => a.type === "A").length, nB: orders.filter((a) => a.type === "B").length };
-    return { n: orders.length, want, avail, zx: want - avail, zy: bread - breadHave, ...c };
-  }
-  // Suggested next price: scale the price by apples wanted / apples available (the auctioneer's rule).
-  function suggest(p, h) {
-    if (!h || !h.avail || !h.want) return p;
-    return Math.max(0.1, Math.round(10 * p * (h.want / h.avail)) / 10);
-  }
-
-  // ---------- controls ----------
-  $("open").onclick = async () => {
-    if (!D.state) return;
-    const p = Number($("price").value);
-    if (!(p > 0)) { alert("Enter a positive price."); return; }
-    const r = (D.state.round || 0) + (D.state.open ? 0 : 1);
-    await S.setDoc("", { lobby: lobby(), phase: "round", round: r, price: Math.round(p * 100) / 100, open: true }, true);
-  };
-  $("close").onclick = async () => {
-    const s = D.state; if (!s || s.phase !== "round" || !s.open) return;
-    const st = roundStats(s.round), hist = (s.hist || []).filter((e) => e.r !== s.round);
-    hist.push({ r: s.round, p: s.price, ...st });
-    await S.setDoc("", { open: false, hist }, true);
-    $("price").value = suggest(s.price, st);
-  };
-  $("reveal").onclick = async () => {
-    const s = D.state; if (!s) return;
-    const c = counts(here()), p = B.eqPrice(c.nA, c.nB);
-    if (!p) { alert("Need at least one trader of each type."); return; }
-    await S.setDoc("", { phase: "reveal", open: false, eq: { p: Math.round(p * 100) / 100, nA: c.nA, nB: c.nB } }, true);
-  };
-  $("lobbyBtn").onclick = () => S.setDoc("", { phase: "lobby", open: false }, true);
+  $("next").onclick = () => goTo(curStep() + 1);
+  $("back").onclick = () => goTo(curStep() - 1);
+  $("steps").onchange = (e) => goTo(Number(e.target.value));
   $("newSession").onclick = async () => {
-    if (!confirm("Start a new session? Everyone's phone re-joins automatically; earlier orders are kept out of the results.")) return;
-    await S.setDoc("", newState());
-    $("price").value = B.START_PRICE;
+    if (!confirm("Start a new session? Everyone's phone re-joins automatically; earlier answers are kept out of the results.")) return;
+    await S.setDoc("", { lobby: "L" + Date.now().toString(36), step: 0, phase: "lobby", phaseId: "p" + Date.now() });
   };
   $("bots").onclick = addBots;
+  document.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "SELECT" || e.target.tagName === "INPUT") return;
+    if (e.key === "ArrowRight" || e.key === "PageDown") goTo(curStep() + 1);
+    if (e.key === "ArrowLeft" || e.key === "PageUp") goTo(curStep() - 1);
+  });
+  async function goTo(i) {
+    if (i < 0 || i >= STEPS.length || !D.state) return;
+    await S.setDoc("", { lobby: lobby(), step: i, phase: STEPS[i].id, phaseId: "p" + Date.now() });
+  }
+
+  // ---------- statistics ----------
+  function stepStats(key, n) {
+    const rows = here().map((a) => a.data.r || {});
+    return Array.from({ length: n }, (_, i) => {
+      const ans = rows.map((r) => r[key + i]).filter(Boolean);
+      const ok = ans.filter((a) => a.ok).length, tags = {};
+      for (const a of ans) if (!a.ok) tags[a.tag] = (tags[a.tag] || 0) + 1;
+      const top = Object.entries(tags).sort((x, y) => y[1] - x[1])[0];
+      const hints = here().filter((a) => a.data.h && a.data.h[key + i]).length;
+      return { n: ans.length, ok, share: ans.length ? ok / ans.length : 0, hints, top: top ? { tag: top[0], n: top[1] } : null };
+    });
+  }
+  const done = (key, n) => here().filter((a) => { const r = a.data.r || {}; for (let i = 0; i < n; i++) if (!r[key + i]) return false; return true; }).length;
+  const started = () => here().filter((a) => a.data.r && Object.keys(a.data.r).length).length;
+  const avgScore = (key, n) => {
+    const f = here().filter((a) => { const r = a.data.r || {}; for (let i = 0; i < n; i++) if (!r[key + i]) return false; return true; });
+    return f.length ? B.mean(f.map((a) => { let s = 0; for (let i = 0; i < n; i++) if (a.data.r[key + i].ok) s++; return s; })) : null;
+  };
+  // What each common mistake means (for the results table).
+  const MEANING = {
+    "price on the wrong good": "put p on the wrong good", "ignored the price": "ignored the price", "mixed up the endowments": "mixed up the endowments",
+    "left out y": "left out good y", "priced everything at p": "priced y at p too", "wrong share": "used the wrong share",
+    "forgot to divide by p": "forgot to divide by p", "multiplied by p": "multiplied by p", "used B's income": "used B's income",
+    "used A's share": "used A's share", "used A's income": "used A's income",
+    "forgot to subtract the endowment": "forgot to subtract the endowment", "subtracted the total of y": "subtracted the total of y",
+    "dropped part of demand": "dropped part of demand", "set p = 1": "set p = 1",
+    "swapped x and y": "swapped x and y", "no trade (endowment)": "gave the endowment (no trade)", "used p = 1": "used p = 1",
+    "gave B's bundle": "gave B's bundle", "gave A's bundle": "gave A's bundle", "forgot a/(1−a)": "forgot a/(1−a)", "gave the share": "gave the share a",
+    "efficient = fair": "efficient = fair", "same bundle": "same bundle", "Walras' law": "Walras' law",
+    "mr=demand": "used the demand curve as MR", "halved intercept": "halved the intercept", "slope ×4": "slope too steep",
+    "P=MC (competitive Q)": "set P = MC (competitive output)", "MR=0 (ignored cost)": "set MR = 0 (ignored cost)",
+    "price=MC": "charged P = MC", "revenue-max price": "price where MR = 0", "markup only": "gave the markup P − MC",
+    "revenue (forgot cost)": "gave revenue (forgot cost)", "triangle (½)": "used a triangle (½)", "used competitive Q": "used the competitive Q",
+    "forgot ½": "forgot the ½", "whole competitive surplus": "gave the whole competitive surplus", "halved twice": "halved twice",
+    "inverted": "inverted the markup", "sign": "positive elasticity", "unit elastic": "said e = −1",
+    "that's MC": "gave MC, not AC", "dropped a term": "dropped a term", "divided one term": "divided only one term",
+    "forgot to halve": "forgot to divide by 2", "squared": "squared", "AC at q = 0": "used the constant term",
+    "zero profit ≠ zero price": "zero profit → zero price", "used A, not Q": "used the demand intercept", "forgot ÷ q*": "forgot to divide by q*", "other": "other"
+  };
 
   // ---------- render ----------
-  const BLUE = "#3333b3", ORANGE = "#e8833a";
+  const BLUE = "#3333b3", ORANGE = "#e8833a", GREY = "#d9d9d9";
   Chart.defaults.font.family = '"Helvetica Neue", Arial, sans-serif'; Chart.defaults.font.size = 16; Chart.defaults.color = "#333";
   function chart(id, config) { if (charts[id]) charts[id].destroy(); charts[id] = new Chart($(id), config); }
-  function set(id, v) { const el = $(id); if (el && el.innerHTML !== String(v)) el.innerHTML = v; }
+  function barConfig(key, n) {
+    const s = stepStats(key, n);
+    return { type: "bar", data: { labels: B.STEP_LABELS[key],
+      datasets: [{ label: "% right first time", data: s.map((x) => pct(x.share)), backgroundColor: s.map((x) => (x.share < 0.6 ? ORANGE : BLUE)) }] },
+      options: { maintainAspectRatio: false, animation: false, plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: (c) => c.raw + "% (" + s[c.dataIndex].n + " answers)" } } },
+        scales: { y: { min: 0, max: 100, ticks: { callback: (v) => v + "%" } } } } };
+  }
+  function set(id, v) { const el = $(id); if (el && el.textContent !== String(v)) el.textContent = v; }
   function studentURL() { return location.href.replace(/dashboard\.html.*$/, "").replace(/\?.*$/, ""); }
 
-  function view() {
-    const s = D.state;
-    if (s.phase === "round") return s.open ? "open" : "closed";
-    return s.phase;
-  }
   function render() {
     if (!D.state) return;
-    const v = view(), key = v + lobby() + (D.state.round || 0) + ((D.state.hist || []).length);
-    $("joined").textContent = here().length + " joined";
-    $("close").disabled = v !== "open";
-    if (mountedKey !== key) { mountedKey = key; mount(v); }
-    update(v);
+    const st = STEPS[curStep()], key = st.id + lobby();
+    $("steps").value = curStep(); $("joined").textContent = here().length + " joined";
+    if (mountedKey !== key) { mountedKey = key; mount(st); }
+    update(st);
   }
-
-  function priceChart(withEq) {
-    const h = (D.state.hist || []).slice().sort((a, b) => a.r - b.r);
-    const ds = [
-      { type: "line", label: "Price of an apple (£)", data: h.map((e) => e.p), borderColor: BLUE, backgroundColor: BLUE, yAxisID: "y", tension: 0, pointRadius: 6, borderWidth: 3 },
-      { type: "bar", label: "Excess demand for apples", data: h.map((e) => Math.round(e.zx * 10) / 10), backgroundColor: h.map((e) => (e.zx > 0 ? ORANGE : "#9fb4e0")), yAxisID: "y2" }
-    ];
-    if (withEq && D.state.eq) ds.push({ type: "line", label: "Equilibrium price", data: h.map(() => D.state.eq.p), borderColor: "#2e9e5b", borderDash: [8, 6], pointRadius: 0, yAxisID: "y", borderWidth: 2 });
-    return { data: { labels: h.map((e) => "Round " + e.r), datasets: ds },
-      options: { maintainAspectRatio: false, animation: false, plugins: { legend: { position: "bottom" } },
-        scales: { y: { position: "left", min: 0, suggestedMax: Math.max(1, ...h.map((e) => e.p), (withEq && D.state.eq ? D.state.eq.p : 0)) * 1.25, title: { display: true, text: "£ per apple" } },
-                  y2: { position: "right", grid: { drawOnChartArea: false }, title: { display: true, text: "apples" } } } } };
-  }
-
-  function mount(v) {
+  function mount(st) {
     for (const k of Object.keys(charts)) { charts[k].destroy(); delete charts[k]; }
-    const s = D.state, A = B.TYPES.A, Bt = B.TYPES.B;
     let h = "";
-    if (v === "lobby") h = `<h1>Be the market</h1><div class="rule"></div>
+    if (st.id === "lobby") h = `<h1>Walrasian workout</h1><div class="rule"></div>
       <div class="qrwrap" style="flex-wrap:nowrap"><div class="qr" id="qr"></div><div style="flex:1;min-width:0">
         <p class="lead">Scan the code with your phone camera, or go to</p><p class="url" id="url"></p>
-        <div class="kpis"><div class="kpi"><div class="v" id="k-A">0</div><div class="l">${A.icon} Bakers (12 loaves, no apples)</div></div>
-          <div class="kpi"><div class="v" id="k-B">0</div><div class="l">${Bt.icon} Orchard owners (3 apples, no bread)</div></div></div>
-        <p class="lead muted">I am the auctioneer. I call out a price for apples; you choose what to buy and sell. Bread always costs £1.</p></div></div>`;
-    if (v === "open") h = `<h1>Round ${s.round}: send your orders</h1><div class="rule"></div>
-      <div class="cols"><div><div class="muted lead">Price of an apple</div><div class="bigprice">${B.money(s.price)}</div>
-        <p class="lead">A loaf of bread: £1. Choose the bundle that makes you happiest, then send it.</p></div>
-        <div class="kpis" style="align-content:flex-start"><div class="kpi"><div class="v" id="k-sent">0</div><div class="l">orders sent</div></div>
-          <div class="kpi"><div class="v" id="k-of">0</div><div class="l">traders joined</div></div></div></div>
-      <div class="progress" style="margin-top:12px"><div id="bar"></div></div>`;
-    if (v === "closed") h = `<h1>Round ${s.round}: what did the market want at ${B.money(s.price)}?</h1><div class="rule"></div>
+        <div class="kpis"><div class="kpi"><div class="v" id="k-joined">0</div><div class="l">phones joined</div></div></div>
+        <p class="lead muted">A Walrasian equilibrium, step by step, with your own numbers. Hints if you are stuck; after each answer you see whether it is right, and why.</p></div></div>`;
+    if (st.id === "work") h = `<h1>Work through the steps on your phone</h1><div class="rule"></div>
+      <p class="lead">Your own numbers, at your own pace. Stuck? Tap Hint. Finished early? Try the bonus question.</p>
       <div class="kpis">
-        <div class="kpi"><div class="v" id="k-want">–</div><div class="l">apples wanted</div></div>
-        <div class="kpi"><div class="v" id="k-avail">–</div><div class="l">apples available</div></div>
-        <div class="kpi"><div class="v" id="k-zx">–</div><div class="l">excess demand for apples</div></div>
-        <div class="kpi"><div class="v" id="k-zy">–</div><div class="l">excess demand for bread</div></div></div>
-      <div class="cols"><div><p class="lead" id="verdict"></p><p class="lead" id="walras"></p><p class="muted" id="theory"></p></div>
-        <div class="chartbox" style="height:320px"><canvas id="c-p"></canvas></div></div>`;
-    if (v === "reveal") h = `<h1>The equilibrium</h1><div class="rule"></div>
-      <div class="cols"><div>
-        <p class="lead">With <b id="r-nA"></b> Bakers and <b id="r-nB"></b> Orchard owners, the apple market clears at</p>
-        <div class="bigprice" id="r-p"></div>
-        <p class="muted">Bakers spend half their income on apples: 12 ÷ (2 × price). Orchard owners spend a third of theirs: 3 × price ÷ (3 × price) = 1 apple, whatever the price. At the equilibrium price, the apples everyone wants add up to the apples that exist.</p>
-        <table class="types" id="r-tab"></table></div>
-        <div class="chartbox" style="height:360px"><canvas id="c-p"></canvas></div></div>`;
-    if (v === "end") h = `<h1>Thank you</h1><div class="rule"></div><p class="lead">The auctioneer raised the price when apples were in excess demand and lowered it when they were in excess supply, until the market cleared: a Walrasian equilibrium.</p>`;
+        <div class="kpi"><div class="v" id="k-start">0</div><div class="l">started</div></div>
+        <div class="kpi"><div class="v" id="k-done">0</div><div class="l">found the equilibrium</div></div>
+        <div class="kpi"><div class="v" id="k-bonus">0</div><div class="l">finished the bonus</div></div></div>
+      <div id="live" class="steprow"></div>`;
+    if (st.id === "results") h = `<h1>Where did we get stuck?</h1><div class="rule"></div>
+      <div class="cols"><div><h3>% right first time</h3><div class="chartbox"><canvas id="c-m"></canvas></div></div>
+      <div><h3>Most common mistake at each step</h3><table class="types" id="mist"></table>
+      <h3 style="margin-top:18px">Bonus (MRS and efficiency): % right first time</h3><div class="chartbox" style="height:170px"><canvas id="c-l"></canvas></div></div></div>`;
+    if (st.id === "end") h = `<h1>Thank you</h1><div class="rule"></div><p class="lead">The steps: income = value of the endowment → demand x = a·m/p → excess demand z(p) = demand − endowment → z(p) = 0 gives p* → bundles at p* → both markets clear. At p*, MRS<sub>A</sub> = MRS<sub>B</sub> = p*: Pareto efficient.</p>`;
     stage.innerHTML = h;
-    if (v === "lobby") {
+    if (st.id === "lobby") {
       const url = studentURL(); set("url", url.replace(/^https?:\/\//, ""));
       const q = qrcode(0, "M"); q.addData(url); q.make(); $("qr").innerHTML = q.createSvgTag({ cellSize: 8, margin: 2, scalable: true });
     }
-    if (v === "closed" && $("c-p")) chart("c-p", priceChart(false));
-    if (v === "reveal" && $("c-p")) chart("c-p", priceChart(true));
+    if (st.id === "results") { chart("c-m", barConfig("w", 7)); chart("c-l", barConfig("b", 2)); }
   }
-
-  function update(v) {
-    const s = D.state;
-    if (v === "lobby") { const c = counts(here()); set("k-A", c.nA); set("k-B", c.nB); }
-    if (v === "open") {
-      const st = roundStats(s.round), n = here().length;
-      set("k-sent", st.n); set("k-of", n);
-      const bar = $("bar"); if (bar) bar.style.width = (n ? (100 * st.n) / n : 0) + "%";
+  function update(st) {
+    if (st.id === "lobby") set("k-joined", here().length);
+    if (st.id === "work") {
+      set("k-start", started()); set("k-done", done("w", 7)); set("k-bonus", done("b", 2));
+      const s = stepStats("w", 7), el = $("live");
+      if (el) el.innerHTML = s.map((x, i) => `<div class="stepbox"><div class="l">${i + 1}. ${B.STEP_LABELS.w[i]}</div>
+        <div class="v">${x.n ? pct(x.share) + "%" : "–"}</div><div class="l">${x.n} answered · ${x.hints} hints</div>
+        <div class="bar"><span style="width:${x.n ? pct(x.share) : 0}%"></span></div></div>`).join("");
     }
-    if (v === "closed") {
-      const h = (s.hist || []).find((e) => e.r === s.round); if (!h) return;
-      set("k-want", B.num(h.want, 1)); set("k-avail", B.num(h.avail, 1));
-      set("k-zx", (h.zx > 0 ? "+" : "") + B.num(h.zx, 1)); set("k-zy", (h.zy > 0 ? "+" : "") + B.num(h.zy, 1));
-      const close = Math.abs(h.zx) < 0.05 * Math.max(1, h.avail);
-      set("verdict", close ? `<span class="arrow ok">✓</span> The apple market (almost) clears at ${B.money(h.p)}.`
-        : h.zx > 0 ? `<span class="arrow up">▲</span> Excess <b>demand</b> for apples: raise the price. Suggested next price: <b>${B.money(suggest(h.p, h))}</b>`
-                   : `<span class="arrow down">▼</span> Excess <b>supply</b> of apples: lower the price. Suggested next price: <b>${B.money(suggest(h.p, h))}</b>`);
-      const val = h.p * h.zx + h.zy;
-      set("walras", `<b>Walras' law:</b> ${B.money(h.p)} × (${B.num(h.zx, 1)}) + (${B.num(h.zy, 1)}) = <b>${B.num(Math.abs(val) < 0.005 ? 0 : val, 2)}</b>. Excess demand for apples is paid for with an excess supply of bread.`);
-      const tz = B.theoryZ(h.nA, h.nB, h.p);
-      set("theory", `If all ${h.n} traders had chosen their very best bundle, excess demand for apples would be ${B.num(tz, 1)}.`);
-    }
-    if (v === "reveal" && s.eq) {
-      set("r-nA", s.eq.nA); set("r-nB", s.eq.nB); set("r-p", B.money(s.eq.p));
-      const A = B.TYPES.A, Bt = B.TYPES.B, a = B.best(A, s.eq.p), b = B.best(Bt, s.eq.p);
-      set("r-tab", `<tr><th></th><th class="num">owns</th><th class="num">ends with</th><th class="num">happiness</th></tr>
-        <tr><td>${A.icon} Baker</td><td class="num">0 🍎, 12 🍞</td><td class="num">${B.num(a.x, 2)} 🍎, ${B.num(a.y, 2)} 🍞</td><td class="num">0 → ${B.num(B.points(A, a.x, a.y), 1)}</td></tr>
-        <tr><td>${Bt.icon} Orchard owner</td><td class="num">3 🍎, 0 🍞</td><td class="num">${B.num(b.x, 2)} 🍎, ${B.num(b.y, 2)} 🍞</td><td class="num">0 → ${B.num(B.points(Bt, b.x, b.y), 1)}</td></tr>`);
+    if (st.id === "results") {
+      chart("c-m", barConfig("w", 7)); chart("c-l", barConfig("b", 2));
+      const s = stepStats("w", 7), t = $("mist");
+      if (t) t.innerHTML = `<tr><th>Step</th><th class="num">Right</th><th class="num">Hint</th><th>Most common mistake</th></tr>` + s.map((x, i) =>
+        `<tr><td>${i + 1}. ${B.STEP_LABELS.w[i]}</td><td class="num">${x.n ? pct(x.share) + "%" : "–"}</td><td class="num">${x.n ? pct(x.hints / x.n) + "%" : "–"}</td><td>${x.top ? MEANING[x.top.tag] + " (" + x.top.n + ")" : "–"}</td></tr>`).join("");
     }
   }
 
   // ---------- demo: simulated students ----------
   async function addBots() {
-    const s = D.state; if (!s) return;
-    const items = [];
+    const items = [], P = { w: [0.85, 0.7, 0.65, 0.45, 0.6, 0.7, 0.75], b: [0.55, 0.8] };
     for (let k = 0; k < 16; k++) {
-      const id = "bot" + Math.random().toString(36).slice(2, 8), t = B.typeOf(id), r = {};
-      if (s.phase === "round" && s.open) {
-        const p = s.price, m = B.income(t, p), bx = B.best(t, p).x;
-        const x = Math.max(0, Math.min(m / p, Math.round(10 * bx * (0.8 + 0.4 * Math.random())) / 10));
-        r[rk(s.round)] = { p, x, y: m - p * x, t: Date.now() };
+      const id = "bot" + Math.random().toString(36).slice(2, 8), r = {};
+      const depth = Math.random();
+      for (const ex of B.EX) {
+        const steps = ex.steps(id), n = ex.key === "w" ? Math.min(7, Math.floor(depth * 10)) : depth > 0.7 ? Math.floor((depth - 0.7) * 7) : 0;
+        for (let i = 0; i < Math.min(n, steps.length); i++) {
+          const ok = Math.random() < P[ex.key][i], wrong = steps[i].options.filter((o) => !o.correct), o = ok ? steps[i].options.find((x) => x.correct) : wrong[Math.floor(Math.random() * wrong.length)];
+          r[ex.key + i] = { ok: o.correct, tag: o.tag, key: o.key, t: Date.now(), nx: true };
+        }
       }
-      items.push(["tr/" + id, { lobby: lobby(), type: t.key, joinedAt: Date.now(), r }]);
+      const h = {}; for (const k of Object.keys(r)) if (Math.random() < 0.3) h[k] = true;
+      items.push(["ans/" + id, { lobby: lobby(), joinedAt: Date.now(), r, h }]);
     }
     await S.batchSet(items);
-  }
-  // In demo mode, bots that have joined also answer each new round.
-  if (S.demo) {
-    let answered = null;
-    setInterval(async () => {
-      const s = D.state; if (!s || s.phase !== "round" || !s.open || answered === lobby() + s.round) return;
-      const bots = here().filter((a) => a.id.startsWith("bot")); if (!bots.length) return;
-      answered = lobby() + s.round;
-      const items = bots.map((a) => {
-        const t = B.TYPES[a.data.type], p = s.price, m = B.income(t, p), bx = B.best(t, p).x;
-        const x = Math.max(0, Math.min(m / p, Math.round(10 * bx * (0.8 + 0.4 * Math.random())) / 10));
-        return ["tr/" + a.id, { r: { [rk(s.round)]: { p, x, y: m - p * x, t: Date.now() } } }, true];
-      });
-      await S.batchSet(items);
-    }, 1500);
   }
 })();

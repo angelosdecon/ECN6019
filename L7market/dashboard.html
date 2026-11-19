@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 7: be the market – Dashboard</title>
+<link rel="stylesheet" href="../shared/style.css">
+<style>
+  .types { width: 100%; border-collapse: collapse; font-size: 19px; }
+  .types td, .types th { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; }
+  .types td.num, .types th.num { text-align: right; }
+  .arrow { font-size: 30px; font-weight: 700; }
+  .arrow.up { color: var(--warn); } .arrow.down { color: var(--blue); } .arrow.ok { color: var(--ok); }
+  .controls input[type=number] { font: inherit; width: 90px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; }
+  .bigprice { font-size: 64px; font-weight: 700; color: var(--blue); }
+  .twotypes { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+</style>
+</head>
+<body class="dash">
+  <div class="band">
+    <div><div class="brand">Week 7: be the market</div><div class="sub" id="modname"></div></div>
+    <div style="display:flex;gap:10px;align-items:center"><span id="demoflag"></span><span id="joined" class="pill"></span></div>
+  </div>
+  <main><div class="stage" id="stage"></div></main>
+  <div class="controls" id="controls">
+    <label>Price of an apple £ <input type="number" id="price" min="0.1" step="0.1" value="1"></label>
+    <button class="primary" id="open">Open round ▶</button>
+    <button id="close">Close round ■</button>
+    <button id="reveal">Reveal equilibrium</button>
+    <div class="grow"></div>
+    <button id="lobbyBtn" title="Back to the join screen">Join screen</button>
+    <button id="bots" class="hidden">+ 16 simulated students</button>
+    <button id="newSession" title="Start a new session: everyone re-joins">New session</button>
+  </div>
+
+  <script src="../shared/config.js"></script>
+  <script src="../shared/lib/firebase-app-compat.js"></script>
+  <script src="../shared/lib/firebase-firestore-compat.js"></script>
+  <script src="../shared/lib/chart.umd.min.js"></script>
+  <script src="../shared/lib/qrcode.js"></script>
+  <script src="../shared/store.js"></script>
+  <script src="js/common.js?v=1"></script>
+  <script src="js/dashboard.js?v=1"></script>
+</body>
+</html>
