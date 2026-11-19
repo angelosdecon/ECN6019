@@ -20,6 +20,9 @@
 
   const st = { state: null, mine: undefined };
   const ui = { picked: null, hint: null };   // option just picked; step whose hint is open
+  // Round 0 is the class exercise (the lecture economy, saved for the dashboard).
+  // Rounds 1, 2, … are "Try another economy": new numbers, kept on this phone only.
+  const prac = { round: 0, r: {} };
   S.onDoc("", (d) => { st.state = d; register(); render(); });
   S.onDoc("ans/" + pid, (d) => { st.mine = d; register(); render(); });
 
@@ -27,6 +30,7 @@
   const open = () => st.state && ["work", "results", "end"].includes(st.state.phase);
   const mine = () => (st.mine && st.mine.lobby === lobby() ? st.mine : null);
   const NW = B.EX[0].steps(pid).length, NB = B.EX[1].steps(pid).length;
+  const answers = () => (prac.round ? prac.r : (mine() && mine().r) || {});
 
   function register() {
     if (!lobby() || st.mine === undefined) return;
@@ -37,9 +41,9 @@
 
   // Where is this student? The first exercise/step without an answer.
   function position() {
-    const r = (mine() && mine().r) || {};
+    const r = answers();
     for (const ex of B.EX) {
-      const steps = ex.steps(pid);
+      const steps = ex.steps(pid, prac.round);
       for (let i = 0; i < steps.length; i++) if (!r[ex.key + i] || !r[ex.key + i].nx) return { ex, steps, i, r };
     }
     return { done: true, r };
@@ -50,28 +54,30 @@
   function render() {
     let sig, html;
     if (!lobby()) { sig = "wait"; html = `<h2>Welcome</h2><div class="rule"></div><p>Waiting for the lecturer to open the session…</p>`; }
-    else if (!open()) { sig = "lobby" + lobby(); html = `<h2>You're in</h2><div class="rule"></div><p>Keep this page open. The exercise starts when the lecturer opens it.</p><div class="card soft small">A Walrasian equilibrium, step by step, with your own numbers. Stuck? Tap <b>Hint</b>. After each answer you see straight away whether it is right, and why.</div>`; }
+    else if (!open()) { sig = "lobby" + lobby(); html = `<h2>You're in</h2><div class="rule"></div><p>Keep this page open. The exercise starts when the lecturer opens it.</p><div class="card soft small">A Walrasian equilibrium, step by step: the economy from the lecture. Stuck? Tap <b>Hint</b>. After each answer you see straight away whether it is right, and why.</div>`; }
     else {
       const pos = position();
       if (pos.done) {
         const w = score(pos.r, "w", NW), b = score(pos.r, "b", NB);
-        sig = "done" + w.ok + b.ok;
-        html = `<h2>Well done!</h2><div class="rule"></div>
-          ${graph(B.econ(pid), 99)}
+        sig = "done" + prac.round + "-" + w.ok + b.ok;
+        html = `<h2>${prac.round ? "Economy " + (prac.round + 1) + " done!" : "Well done!"}</h2><div class="rule"></div>
+          ${graph(B.econ(pid, prac.round), 99)}
           <div class="card soft"><p><b>Walrasian equilibrium:</b> ${w.ok} / ${NW} right first time</p><p><b>Bonus (efficiency):</b> ${b.ok} / ${NB} right first time</p></div>
-          <p class="muted">Look up at the screen for how the class did. The same steps are in the lecture notes, and in Problem Set 7, Question 4.</p>`;
+          ${prac.round ? `<p class="muted">Extra practice: these answers stay on your phone.</p>` : `<p class="muted">Look up at the screen for how the class did. We now go through this example together on the slides.</p>`}
+          <button class="primary full" id="another">Try another economy ▶</button>
+          <p class="small muted center">New numbers, same steps. Good practice for Problem Set 7, Question 4, and the exam.</p>`;
       } else {
         const { ex, steps, i, r } = pos, s = steps[i], saved = r[ex.key + i];
         const picked = saved ? { key: saved.key } : ui.picked && ui.picked.step === ex.key + i ? ui.picked : null;
         const hintOpen = ui.hint === ex.key + i;
-        sig = ex.key + i + (picked ? picked.key : "") + (hintOpen ? "h" : "");
+        sig = prac.round + "-" + ex.key + i + (picked ? picked.key : "") + (hintOpen ? "h" : "");
         const sc = score(r, ex.key, steps.length);
         const level = ex.key === "w" ? i + (picked ? 1 : 0) : 99;
         const dots = steps.map((_, k) => { const a = r[ex.key + k] && r[ex.key + k].nx ? r[ex.key + k] : null; return `<span class="chip ${a ? (a.ok ? "okc" : "noc") : k === i ? "cur" : "empty"}">${a ? (a.ok ? "✓" : "✗") : k + 1}</span>`; }).join("");
-        let body = `<div class="small muted">${ex.title} · step ${i + 1} of ${steps.length}</div>
+        let body = `<div class="small muted">${prac.round ? "Economy " + (prac.round + 1) + " · " : ""}${ex.title} · step ${i + 1} of ${steps.length}</div>
           <h2 style="margin-top:4px">${s.title}</h2><div class="rule"></div>
           <div class="card soft small">${steps[0].intro}${i ? `<div class="known"><b>What we know so far</b><ul>${steps.slice(0, i).map((x) => `<li>${x.fact}</li>`).join("")}</ul></div>` : ""}</div>
-          ${graph(B.econ(pid), level)}
+          ${graph(B.econ(pid, prac.round), level)}
           <p>${s.q}</p>`;
         if (!picked) {
           body += hintOpen ? `<div class="hint">💡 ${s.hint}</div>` : `<button class="hintbtn" id="hint">💡 Hint</button>`;
@@ -91,6 +97,7 @@
     view.querySelectorAll(".opt[data-k]").forEach((b) => (b.onclick = () => pick(b.dataset.k)));
     const nx = document.getElementById("next"); if (nx) nx.onclick = next;
     const hb = document.getElementById("hint"); if (hb) hb.onclick = showHint;
+    const an = document.getElementById("another"); if (an) an.onclick = another;
   }
 
   // The Edgeworth box, drawn with the student's own numbers.
@@ -117,10 +124,22 @@
       // budget line through E with slope −p*: y = ay + P (ax − x)
       const pts = [0, X].map((u) => `${x(u)},${y(ay + P * (ax - u))}`).join(" ");
       s += `<polyline points="${pts}" stroke="#333" stroke-width="2" fill="none" clip-path="url(#bx)"/>`;
-      // label the line where it leaves the box on the side with more room
-      let lx = ax < X / 2 ? Math.min(X, ax + (Y + 0 - ay) / -P) : ax - 0.3 * ax, ly;
-      lx = ax < X / 2 ? ax + 0.55 * (X - ax) : 0.45 * ax; ly = ay + P * (ax - lx);
-      if (ly > 0.08 * Y && ly < 0.92 * Y) s += `<text x="${x(lx) + 6}" y="${y(ly) - 8}" font-size="10" fill="#333" paint-order="stroke" stroke="#fff" stroke-width="3">budget line, slope −${n(P)}</text>`;
+      // label the line at the point that keeps the text inside the box and furthest from E and W
+      const TW = 128, avoid = [[x(ax), y(ay)], [x(e.xA), y(e.yA)]];
+      let best = null;
+      for (let k = 1; k < 40; k++) {
+        const lx = (k / 40) * X, ly = ay + P * (ax - lx), px = x(lx), py = y(ly);
+        if (ly < 0.1 * Y || ly > 0.9 * Y) continue;
+        // right of the point, above the line; or left of the point, below the line
+        for (const [tx, ty, anc] of [[px + 6, py - 8, "start"], [px - 6, py + 14, "end"]]) {
+          const x0 = anc === "start" ? tx : tx - TW, x1 = x0 + TW;
+          if (x0 < x(0) + 2 || x1 > x(X) - 2 || ty - 10 < y(Y) || ty > y(0) - 2) continue;
+          const cx = (x0 + x1) / 2, cy = ty - 4;
+          const d = Math.min(...avoid.map(([ux, uy]) => Math.max(Math.abs(ux - cx) - TW / 2, 0) + Math.abs(uy - cy) * 2));
+          if (!best || d > best.d) best = { d, tx, ty, anc };
+        }
+      }
+      if (best) s += `<text x="${best.tx}" y="${best.ty}" text-anchor="${best.anc}" font-size="10" fill="#333" paint-order="stroke" stroke="#fff" stroke-width="3">budget line, slope −${n(P)}</text>`;
     }
     if (level >= 7) {
       // indifference curves through W, tangent to the budget line
@@ -160,13 +179,14 @@
     const pos = position(); if (pos.done) return;
     const step = pos.ex.key + pos.i;
     ui.hint = step; render();
-    S.updateDoc("ans/" + pid, { lobby: lobby(), ["h." + step]: true });
+    if (!prac.round) S.updateDoc("ans/" + pid, { lobby: lobby(), ["h." + step]: true });
   }
   // The first answer is saved straight away (so the dashboard sees it); "Next" just moves on.
   function pick(key) {
     const pos = position(); if (pos.done || pos.r[pos.ex.key + pos.i]) return;
     const s = pos.steps[pos.i], o = s.options.find((x) => x.key === key), step = pos.ex.key + pos.i;
     ui.picked = { step, key };
+    if (prac.round) { prac.r[step] = { ok: o.correct, tag: o.tag, key, nx: false }; render(); return; }
     render();
     S.updateDoc("ans/" + pid, { lobby: lobby(), ["r." + step]: { ok: o.correct, tag: o.tag, key, t: Date.now(), nx: false } });
   }
@@ -174,7 +194,12 @@
     const pos = position(); if (pos.done) return;
     const step = pos.ex.key + pos.i;
     if (!pos.r[step]) return;
-    await S.updateDoc("ans/" + pid, { ["r." + step + ".nx"]: true });
+    if (prac.round) prac.r[step].nx = true;
+    else await S.updateDoc("ans/" + pid, { ["r." + step + ".nx"]: true });
+    ui.picked = null; ui.hint = null; window.scrollTo(0, 0); render();
+  }
+  function another() {
+    prac.round++; prac.r = {};
     ui.picked = null; ui.hint = null; window.scrollTo(0, 0); render();
   }
 })();

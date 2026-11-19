@@ -128,9 +128,9 @@
       <div class="qrwrap" style="flex-wrap:nowrap"><div class="qr" id="qr"></div><div style="flex:1;min-width:0">
         <p class="lead">Scan the code with your phone camera, or go to</p><p class="url" id="url"></p>
         <div class="kpis"><div class="kpi"><div class="v" id="k-joined">0</div><div class="l">phones joined</div></div></div>
-        <p class="lead muted">A Walrasian equilibrium, step by step, with your own numbers. Hints if you are stuck; after each answer you see whether it is right, and why.</p></div></div>`;
+        <p class="lead muted">A Walrasian equilibrium, step by step: the economy from the lecture. Hints if you are stuck; after each answer you see whether it is right, and why.</p></div></div>`;
     if (st.id === "work") h = `<h1>Work through the steps on your phone</h1><div class="rule"></div>
-      <p class="lead">Your own numbers, at your own pace. Stuck? Tap Hint. Finished early? Try the bonus question.</p>
+      <p class="lead">At your own pace. Stuck? Tap Hint. Finished early? Try the bonus question, then another economy.</p>
       <div class="kpis">
         <div class="kpi"><div class="v" id="k-start">0</div><div class="l">started</div></div>
         <div class="kpi"><div class="v" id="k-done">0</div><div class="l">found the equilibrium</div></div>
