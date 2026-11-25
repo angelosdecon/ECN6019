@@ -3,9 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Week 8: game theory</title>
+<title>Week 8: Cournot and game theory</title>
 <link rel="stylesheet" href="../shared/style.css">
 <style>
+  .opts { display: grid; gap: 10px; margin: 12px 0; }
+  .opt { font-size: 19px; padding: 14px; text-align: left; border-radius: 12px; }
+  .opt.right { background: #e3f4ea; border-color: var(--ok); color: #1e6b3d; font-weight: 700; }
+  .opt.wrong { background: #fbe6e3; border-color: var(--warn); color: var(--warn); font-weight: 700; }
+  .opt.dim { opacity: 0.45; }
+  .known { margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e5d39a; }
+  .known ul { margin: 4px 0 0; padding-left: 18px; }
+  .hintbtn { margin: 4px 0 2px; }
+  .hint { background: #fff8e0; border: 1px solid #f0dc9c; border-radius: 10px; padding: 10px 12px; font-size: 15px; margin: 6px 0; }
+  .egraph { width: 100%; max-width: 380px; height: auto; display: block; margin: 6px auto 2px; font-family: inherit; }
   .okcard { background: #eef8f2; border-color: #bfe3cc; }
   .nocard { background: #fdf1ef; border-color: #f2c9c2; }
   .card p { margin: 8px 0 0; }
@@ -30,7 +40,7 @@
 </head>
 <body class="student">
   <div class="band">
-    <div><div class="brand">Week 8: game theory</div><div class="sub" id="modname"></div></div>
+    <div><div class="brand">Week 8: Cournot and game theory</div><div class="sub" id="modname"></div></div>
     <div id="status" class="small muted"></div>
   </div>
   <main id="view"><p class="muted">Loading…</p></main>
@@ -39,7 +49,7 @@
   <script src="../shared/lib/firebase-app-compat.js"></script>
   <script src="../shared/lib/firebase-firestore-compat.js"></script>
   <script src="../shared/store.js"></script>
-  <script src="js/common.js?v=1"></script>
-  <script src="js/student.js?v=1"></script>
+  <script src="js/common.js?v=2"></script>
+  <script src="js/student.js?v=2"></script>
 </body>
 </html>

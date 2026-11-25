@@ -1,4 +1,5 @@
-// Week 8 dashboard: "Guess 2/3 of the average" (two rounds) and "Spot the equilibrium".
+// Week 8 dashboard: "Cournot workout" (main), then, if there is time, "Guess 2/3 of the average" (two rounds),
+// and "Spot the equilibrium" (optional).
 (function () {
   const S = window.Store, B = window.BL, cfg = window.BIASLAB_CONFIG || {};
   const stage = document.getElementById("stage");
@@ -20,13 +21,15 @@
 
   const STEPS = [
     { id: "lobby", label: "Join (QR code)" },
-    { id: "r1", label: "Round 1: guess ⅔ of the average (open)" },
-    { id: "r1res", label: "Round 1: results" },
-    { id: "r2", label: "Round 2: guess again (open)" },
-    { id: "r2res", label: "Round 2: results" },
-    { id: "theory", label: "What game theory predicts" },
-    { id: "spot", label: "Spot the equilibrium: live progress" },
-    { id: "results", label: "Spot the equilibrium: results" },
+    { id: "work", label: "Cournot workout: live progress" },
+    { id: "wres", label: "Cournot workout: where did we get stuck?" },
+    { id: "r1", label: "If there is time – ⅔ game, round 1 (open)" },
+    { id: "r1res", label: "⅔ game, round 1: results" },
+    { id: "r2", label: "⅔ game, round 2 (open)" },
+    { id: "r2res", label: "⅔ game, round 2: results" },
+    { id: "theory", label: "⅔ game: what game theory predicts" },
+    { id: "spot", label: "Optional – spot the equilibrium: live" },
+    { id: "sres", label: "Optional – spot the equilibrium: results" },
     { id: "end", label: "End" }
   ];
   $("steps").innerHTML = STEPS.map((s, i) => `<option value="${i}">${i + 1}. ${s.label}</option>`).join("");
@@ -79,6 +82,28 @@
       return { n: ans.length, ok, share: ans.length ? ok / ans.length : 0, top: top ? { tag: top[0], n: top[1] } : null };
     });
   }
+  // ---------- statistics for the Cournot workout ----------
+  function stepStats(key, n) {
+    return Array.from({ length: n }, (_, i) => {
+      const ans = here().map((a) => (a.data.w || {})[key + i]).filter(Boolean);
+      const ok = ans.filter((a) => a.ok).length, tags = {};
+      for (const a of ans) if (!a.ok) tags[a.tag] = (tags[a.tag] || 0) + 1;
+      const top = Object.entries(tags).sort((x, y) => y[1] - x[1])[0];
+      const hints = here().filter((a) => a.data.h && a.data.h[key + i]).length;
+      return { n: ans.length, ok, share: ans.length ? ok / ans.length : 0, hints, top: top ? { tag: top[0], n: top[1] } : null };
+    });
+  }
+  const NC = B.STEP_LABELS.c.length, NB = B.STEP_LABELS.b.length;
+  const wDone = (key, n) => here().filter((a) => { const r = a.data.w || {}; for (let i = 0; i < n; i++) if (!r[key + i]) return false; return true; }).length;
+  const wStarted = () => here().filter((a) => a.data.w && Object.keys(a.data.w).length).length;
+  function barConfig(key, n) {
+    const s = stepStats(key, n);
+    return { type: "bar", data: { labels: B.STEP_LABELS[key],
+      datasets: [{ label: "% right first time", data: s.map((x) => pct(x.share)), backgroundColor: s.map((x) => (x.share < 0.6 ? ORANGE : BLUE)) }] },
+      options: { maintainAspectRatio: false, animation: false, plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: (c) => c.raw + "% (" + s[c.dataIndex].n + " answers)" } } },
+        scales: { y: { min: 0, max: 100, ticks: { callback: (v) => v + "%" } } } } };
+  }
   const started = () => here().filter((a) => a.data.s && Object.keys(a.data.s).length).length;
   const finished = () => here().filter((a) => { const s = a.data.s || {}; return B.TYPES.every((_, k) => s["k" + k]); }).length;
 
@@ -117,11 +142,22 @@
   function mount(st) {
     for (const k of Object.keys(charts)) { charts[k].destroy(); delete charts[k]; }
     let h = "";
-    if (st.id === "lobby") h = `<h1>Two games on your phone</h1><div class="rule"></div>
+    if (st.id === "lobby") h = `<h1>Cournot workout</h1><div class="rule"></div>
       <div class="qrwrap" style="flex-wrap:nowrap"><div class="qr" id="qr"></div><div style="flex:1;min-width:0">
         <p class="lead">Scan the code with your phone camera, or go to</p><p class="url" id="url"></p>
         <div class="kpis"><div class="kpi"><div class="v" id="k-joined">0</div><div class="l">phones joined</div></div></div>
-        <p class="lead muted">1. Guess ⅔ of the average (two rounds). 2. Spot the equilibrium, at your own pace.</p></div></div>`;
+        <p class="lead muted">A Cournot duopoly, step by step, with your own numbers. Hints if you are stuck; after each answer you see whether it is right, and why. Then, if there is time: guess ⅔ of the average.</p></div></div>`;
+    if (st.id === "work") h = `<h1>Work through the steps on your phone</h1><div class="rule"></div>
+      <p class="lead">At your own pace. Stuck? Tap Hint. Finished early? Try the bonus (three firms), then another market.</p>
+      <div class="kpis">
+        <div class="kpi"><div class="v" id="k-wstart">0</div><div class="l">started</div></div>
+        <div class="kpi"><div class="v" id="k-wdone">0</div><div class="l">found the equilibrium</div></div>
+        <div class="kpi"><div class="v" id="k-wbonus">0</div><div class="l">finished the bonus</div></div></div>
+      <div id="wlive" class="steprow"></div>`;
+    if (st.id === "wres") h = `<h1>Where did we get stuck?</h1><div class="rule"></div>
+      <div class="cols"><div><h3>% right first time</h3><div class="chartbox"><canvas id="c-m"></canvas></div></div>
+      <div><h3>Most common mistake at each step</h3><table class="types" id="wmist"></table>
+      <h3 style="margin-top:18px">Bonus (three firms): % right first time</h3><div class="chartbox" style="height:170px"><canvas id="c-b"></canvas></div></div></div>`;
     if (st.id === "r1" || st.id === "r2") h = `<h1>${st.id === "r1" ? "Round 1" : "Round 2"}: guess ⅔ of the average</h1><div class="rule"></div>
       <p class="lead">Pick a whole number from 0 to 100. The winner is closest to <b>two thirds of the class average</b>.${st.id === "r2" ? " Now you know how the class played round 1." : ""}</p>
       <div class="kpis"><div class="kpi"><div class="v" id="k-sent">0</div><div class="l">numbers sent</div></div>
@@ -144,11 +180,12 @@
       <div class="kpis"><div class="kpi"><div class="v" id="k-start">0</div><div class="l">started</div></div>
       <div class="kpi"><div class="v" id="k-done">0</div><div class="l">finished all six</div></div></div>
       <div id="live" class="steprow"></div>`;
-    if (st.id === "results") h = `<h1>Spot the equilibrium: how did we do?</h1><div class="rule"></div>
+    if (st.id === "sres") h = `<h1>Spot the equilibrium: how did we do?</h1><div class="rule"></div>
       <div class="cols"><div><h3>% right first time</h3><div class="chartbox"><canvas id="c-s"></canvas></div></div>
       <div><h3>Most common mistake</h3><table class="types" id="mist"></table></div></div>`;
     if (st.id === "end") h = `<h1>Thank you</h1><div class="rule"></div>
-      <p class="lead">To find a Nash equilibrium: mark each player's best responses; the equilibria are the cells where <b>both</b> are marked. A game can have one, several or none.</p>`;
+      <p class="lead">The Cournot steps: profit π<sub>1</sub> = (a − q<sub>1</sub> − q<sub>2</sub>)q<sub>1</sub> − cq<sub>1</sub> → first-order condition a − c − 2q<sub>1</sub> − q<sub>2</sub> = 0 → best response q<sub>1</sub> = (a − c)/2 − ½q<sub>2</sub> → where the best responses cross, q* = (a − c)/3 → price from demand → profit (p* − c)q*. With n firms, q* = (a − c)/(n + 1) and p* → c.</p>
+      <p class="lead muted">Your phone keeps the exercise: “Try another market” gives new numbers.</p>`;
     stage.innerHTML = h;
     if (st.id === "lobby") {
       const url = studentURL(); set("url", url.replace(/^https?:\/\//, ""));
@@ -156,6 +193,19 @@
     }
   }
   function update(st) {
+    if (st.id === "work") {
+      set("k-wstart", wStarted()); set("k-wdone", wDone("c", NC)); set("k-wbonus", wDone("b", NB));
+      const s = stepStats("c", NC), el = $("wlive");
+      if (el) el.innerHTML = s.map((x, i) => `<div class="stepbox"><div class="l">${i + 1}. ${B.STEP_LABELS.c[i]}</div>
+        <div class="v">${x.n ? pct(x.share) + "%" : "–"}</div><div class="l">${x.n} answered · ${x.hints} hints</div>
+        <div class="bar"><span style="width:${x.n ? pct(x.share) : 0}%"></span></div></div>`).join("");
+    }
+    if (st.id === "wres") {
+      chart("c-m", barConfig("c", NC)); chart("c-b", barConfig("b", NB));
+      const s = stepStats("c", NC), t = $("wmist");
+      if (t) t.innerHTML = `<tr><th>Step</th><th class="num">Right</th><th class="num">Hint</th><th>Most common mistake</th></tr>` + s.map((x, i) =>
+        `<tr><td>${i + 1}. ${B.STEP_LABELS.c[i]}</td><td class="num">${x.n ? pct(x.share) + "%" : "–"}</td><td class="num">${x.n ? pct(x.hints / x.n) + "%" : "–"}</td><td>${x.top ? (B.CMEANING[x.top.tag] || x.top.tag) + " (" + x.top.n + ")" : "–"}</td></tr>`).join("");
+    }
     if (st.id === "lobby") set("k-joined", here().length);
     if (st.id === "r1" || st.id === "r2") { set("k-sent", guesses(st.id).length); set("k-joined2", here().length); }
     if (st.id === "r1res" || st.id === "r2res") {
@@ -184,7 +234,7 @@
         <div class="v">${x.n ? pct(x.share) + "%" : "–"}</div><div class="l">${x.n} answered</div>
         <div class="bar"><span style="width:${x.n ? pct(x.share) : 0}%"></span></div></div>`).join("");
     }
-    if (st.id === "results") {
+    if (st.id === "sres") {
       const s = spotStats();
       chart("c-s", { type: "bar", data: { labels: B.TYPE_LABELS, datasets: [{ label: "% right first time", data: s.map((x) => pct(x.share)), backgroundColor: s.map((x) => (x.share < 0.6 ? ORANGE : BLUE)) }] },
         options: { maintainAspectRatio: false, animation: false, plugins: { legend: { display: false } }, scales: { y: { min: 0, max: 100, ticks: { callback: (v) => v + "%" } } } } });
@@ -209,9 +259,19 @@
         const r = B.grade(g, sel);
         s["k" + i] = { ok: r.ok, tag: r.tag, sel, type: g.type, t: Date.now(), nx: true };
       }
+      const w = {}, h = {}, dw = Math.random();
+      for (const ex of B.EX) {
+        const steps = ex.steps(id), nn = ex.key === "c" ? Math.min(steps.length, Math.floor(dw * 8)) : dw > 0.7 ? Math.min(steps.length, Math.floor((dw - 0.7) * 11)) : 0;
+        const PW = { c: [0.85, 0.6, 0.65, 0.55, 0.7, 0.6], b: [0.6, 0.75, 0.8] };
+        for (let i = 0; i < nn; i++) {
+          const right = Math.random() < PW[ex.key][i], wrong = steps[i].options.filter((o) => !o.correct), o = right ? steps[i].options.find((x) => x.correct) : wrong[Math.floor(Math.random() * wrong.length)];
+          w[ex.key + i] = { ok: o.correct, tag: o.tag, key: o.key, t: Date.now(), nx: true };
+          if (Math.random() < 0.3) h[ex.key + i] = true;
+        }
+      }
       const st = curStep(), g = {};
-      if (st >= 1) g.r1 = g1; if (st >= 3) g.r2 = g2;
-      items.push(["pl/" + id, { lobby: lobby(), name: B.nameOf(id), joinedAt: Date.now(), g, s }]);
+      if (st >= 3) g.r1 = g1; if (st >= 5) g.r2 = g2;
+      items.push(["pl/" + id, { lobby: lobby(), name: B.nameOf(id), joinedAt: Date.now(), g, s, w, h }]);
     }
     await S.batchSet(items);
   }
