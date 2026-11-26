@@ -50,7 +50,7 @@
     const ph = phase();
     if (!lobby()) out = { sig: "wait", html: `<h2>Welcome</h2><div class="rule"></div><p>Waiting for the lecturer to open the session…</p>` };
     else if (ph === "lobby") out = { sig: "lobby" + lobby(), html: `<h2>You're in</h2><div class="rule"></div><p>Keep this page open.</p>${nameCard()}
-      <p class="muted">First a Cournot duopoly to solve step by step, with your own numbers. Then, if there is time, a guessing game for the whole class.</p>` };
+      <p class="muted">First a Cournot duopoly to solve step by step, before we do it together on the slides. Later, if there is time, a guessing game for the whole class.</p>` };
     else if (GUESS.includes(ph)) out = guessView(ph);
     else if (ph === "spot" || ph === "sres" || ui.mode === "spot") out = spotView();
     else out = cournotView();
@@ -80,7 +80,7 @@
         <div class="card soft"><p><b>Cournot duopoly:</b> ${c} / ${NC} right first time</p><p><b>Bonus (three firms):</b> ${b} / ${NB} right first time</p></div>
         ${prac.round ? `<p class="muted">Extra practice: these answers stay on your phone.</p>` : `<p class="muted">Look up at the screen for how the class did.</p>`}
         <button class="primary full" id="another">Try another market ▶</button>
-        <p class="small muted center">New numbers, same steps. Good practice for Problem Set 8, Questions 4–6, and the exam.</p>
+        <p class="small muted center">New numbers just for you, same steps. Good practice for Problem Set 8, Questions 4–6, and the exam.</p>
         <button class="full" id="tospot" style="margin-top:10px">More practice: spot the equilibrium ▶</button>` };
     }
     const { ex, steps, i, r } = pos, s = steps[i], saved = r[ex.key + i];

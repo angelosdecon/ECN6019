@@ -1,5 +1,6 @@
 // Week 8: three activities, shared by the student page and the dashboard.
 //  1. "Cournot workout" (main, 26 Nov 2026): a self-paced Cournot duopoly, step by step, multiple choice with hints.
+//     Round 0 uses the lecture's numbers on every phone (done before the worked example on the slides).
 //  2. "Guess 2/3 of the average" (if there is time): everyone picks 0–100; closest to 2/3 of the class average wins. Two rounds.
 //  3. "Spot the equilibrium" (optional extra practice): each phone gets its own payoff matrices; tap the Nash equilibria.
 window.BL = (function () {
@@ -134,8 +135,11 @@ window.BL = (function () {
     }
     return shuffle(out.map((o, i) => Object.assign({ correct: i === 0, key: "o" + i }, o)), seed);
   }
+  // Round 0 is the lecture's market (p = 100 − Q, MC = 4) on every phone: students try it first, then it is
+  // worked through together on the slides. "Try another market" (rounds 1, 2, …) gives each phone its own numbers.
+  const LECTURE = [100, 4];
   function market(pid, round) {
-    const [a, c] = CSETS[(hash(pid + "c") + (round || 0)) % CSETS.length], k = a - c;
+    const [a, c] = round ? CSETS[(hash(pid + "c") + round - 1) % CSETS.length] : LECTURE, k = a - c;
     return { a, c, k, h: k / 2, q: k / 3, Q: 2 * k / 3, p: a - 2 * k / 3, pi: (k / 3) * (k / 3),
       q3: k / 4, Q3: 3 * k / 4, p3: a - 3 * k / 4, pm: (a + c) / 2, qm: k / 2, pim: (k / 2) * (k / 2) };
   }
